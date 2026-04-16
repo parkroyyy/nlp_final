@@ -23,36 +23,46 @@
   <main class="shell">
     <section class="hero">
       <span class="eyebrow">ANLP Spring 2026 · Study Partner</span>
-      <h1>Lecture 11: Multimodal Modeling I</h1>
+      <h1>Multimodal Modeling Companions</h1>
       <p>
-        This companion is for a student who missed lecture and needs the missing connective tissue between the slides.
-        It compresses <code>materials/anlp-s2026-11-multimodal.pdf</code> into the ideas most likely to matter on an exam:
-        how images become token-like vectors, why ViTs are the default visual backbone, what CLIP actually optimizes,
-        how LLaVA-style systems connect vision encoders to decoder LMs, and what Molmo and PaliGemma teach us about
-        token budgets and fine-tuning choices.
+        This companion now covers both multimodal lectures in the repo’s shared HTML study site.
+        It is written for a student who missed class and needs the missing connective tissue the slides assume:
+        what the models are doing, why the engineering choices make sense, where the hidden tradeoffs are,
+        and which concepts are most likely to show up on a quiz or final.
       </p>
       <div class="hero-grid">
         <article class="hero-card">
-          <strong>What this lecture is really about</strong>
-          <p>The core problem is representation. A language model already knows how to process a sequence of vectors, so the entire lecture asks how to turn pixels into a sequence that preserves enough spatial and semantic information to support reasoning and generation.</p>
+          <strong>Lecture 11 focus</strong>
+          <p>The first lecture asks how to turn images into token-like vectors for understanding tasks: ViT patches, CLIP alignment, and vision encoder plus projector plus LM pipelines.</p>
         </article>
         <article class="hero-card">
-          <strong>Quiz-calibrated focus</strong>
-          <p>The answer keys in <code>materials/quizzes/</code> suggest the course tests architecture mechanics and objective interpretation more than historical trivia. That is why these notes emphasize patch counts, attention scaling, the CLIP loss, and what practical ablations imply.</p>
+          <strong>Lecture 12 focus</strong>
+          <p>The second lecture flips the direction. To generate images with a language-model-like system, we need an image tokenizer, an image de-tokenizer, and a way to model image tokens autoregressively.</p>
         </article>
         <article class="hero-card">
-          <strong>Compression strategy</strong>
-          <p>Intro slides, repeated agenda slides, blank transition slides, and pure example screenshots are folded into the concept blocks below. The retained material is concentrated in slides 8-16, 20-24, 26-28, and 31-44.</p>
+          <strong>Quiz-calibrated style</strong>
+          <p>The quiz answer keys suggest the course rewards mechanism-level reasoning more than paper-name recall, so the notes below prioritize objectives, scaling arguments, and what changes when a design choice changes.</p>
         </article>
       </div>
     </section>
 
     <nav class="lecture-tabs" aria-label="Lecture tabs">
       <a class="lecture-tab active" data-lecture-tab="lecture-11-multimodal" href="#lecture-11-multimodal">Lecture 11 · Multimodal I</a>
-      <span class="lecture-tab inactive" aria-disabled="true">Future lecture sections plug in here</span>
+      <a class="lecture-tab inactive" data-lecture-tab="lecture-12-multimodal-ii" href="#lecture-12-multimodal-ii">Lecture 12 · Multimodal II</a>
     </nav>
 
-    <section id="lecture-11-multimodal" data-lecture-panel="lecture-11-multimodal">
+    <section class="lecture-panel" id="lecture-11-multimodal" data-lecture-panel="lecture-11-multimodal">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 11</span>
+        <h2>Multimodal Modeling I</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-11-multimodal.pdf</code> into the ideas most likely to matter on an exam:
+          how images become token-like vectors, why ViTs are the default visual backbone, what CLIP actually optimizes,
+          how LLaVA-style systems connect vision encoders to decoder LMs, and what Molmo and PaliGemma teach us about
+          token budgets and fine-tuning choices.
+        </p>
+      </div>
+
       <h2 class="section-title">Roadmap</h2>
       <p class="section-copy">
         The lecture has a clean narrative arc: first solve the representation problem for images, then learn strong image features from text, then pipe those image features into a language model, and finally compare the engineering choices real systems make once token budget and sample efficiency become bottlenecks.
@@ -424,8 +434,414 @@
       </div>
     </section>
 
+    <section class="lecture-panel" id="lecture-12-multimodal-ii" data-lecture-panel="lecture-12-multimodal-ii">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 12</span>
+        <h2>Multimodal Modeling II</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-12-multimodal-ii.pdf</code> into the core ideas a missed-lecture student actually needs:
+          why generative multimodal modeling needs both an image tokenizer and a de-tokenizer, why raw-pixel autoregression is elegant but impractical,
+          how standard VAE ideas lead into VQ-VAE’s discrete codebook, why VQ-GAN improves perceptual quality, and what DALL-E or Chameleon-style systems gain and lose by making “everything tokens.”
+        </p>
+      </div>
+
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        The lecture starts wide with the main image-generation paradigms, then narrows to one specific goal: make images behave enough like text tokens that a single autoregressive transformer can model both.
+        It first shows why raw-pixel modeling is conceptually simple but computationally brutal, then reviews the VAE machinery needed to understand compression,
+        then replaces continuous latents with a learned discrete codebook in VQ-VAE, and finally shows how VQ-GAN plus a transformer language model produce unified text-and-image token systems such as DALL-E and Chameleon.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Explain why pixel-level autoregression scales poorly even though the likelihood objective is straightforward.</li>
+            <li>State the VAE objective at a high level: reconstruction plus KL regularization toward a prior.</li>
+            <li>Describe VQ-VAE quantization and why a straight-through gradient estimator is needed.</li>
+            <li>Explain what VQ-GAN adds beyond VQ-VAE and why tokenized images are cheaper to model than raw pixels.</li>
+            <li>Interpret the main tradeoff of unified autoregressive image-token models: elegant token unification versus tokenizer information loss.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 1-5, 11, 20, and 44-45 are framing or transition slides, so they are folded into the retained concept blocks rather than treated separately.</li>
+            <li>Slides 15-17 are merged into one pixel-autoregression block because PixelRNN, Image Transformer, and iGPT all illustrate the same core recipe.</li>
+            <li>Slides 22-28 become one VAE bridge section; the ELBO derivation is kept conceptually, but the algebra is compressed to the parts most useful for exam reasoning.</li>
+            <li>Slides 33, 37-38, 40, and 42 are example or output slides, so they are summarized inside the VQ-VAE, VQ-GAN, and unified-model sections instead of receiving standalone note cards.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_3_answer_key.pdf</code> directly tests VQ-VAE’s straight-through estimator, which is a strong signal that this course likes mechanism-level questions.</li>
+            <li>The same quiz also tests ViT scaling and CLIP contrastive reasoning, reinforcing that formulas matter when they explain a design tradeoff.</li>
+            <li><code>ANLP_quiz_4_answer_key.pdf</code> shifts toward diffusion reasoning, so Lecture 12’s closing “unified autoregression is elegant but not the best image-generation paradigm” is likely intentional setup for what comes next.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-12-paradigms">Paradigms</a>
+        <a href="#lecture-12-pixels">Pixel AR</a>
+        <a href="#lecture-12-vae">VAE Bridge</a>
+        <a href="#lecture-12-vqvae">VQ-VAE</a>
+        <a href="#lecture-12-vqgan">VQ-GAN</a>
+        <a href="#lecture-12-unified">Unified Models</a>
+        <a href="#lecture-12-glossary">Glossary</a>
+        <a href="#lecture-12-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card jump-target" id="lecture-12-paradigms">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-12-multimodal-ii/slide-06-generative-paradigms.png" alt="Slide comparing autoregressive models, VAEs, GANs, and diffusion as four major generative modeling paradigms for images">
+            <figcaption>Slides 4-12. The lecture starts broad, but the real target is narrow: build a tokenizer and de-tokenizer so images can enter a single token-based generative pipeline.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 4-12</span>
+              <span class="tag accent">Paradigm map</span>
+              <span class="tag blue">Framing that matters</span>
+            </div>
+            <h3>The lecture is not just surveying image generators; it is motivating a specific multimodal design goal</h3>
+            <p>
+              The early slides list four generative paradigms for images: autoregressive models, VAEs, GANs, and diffusion.
+              The important hidden message is that the lecture is not trying to crown one universal winner.
+              It is trying to solve a multimodal systems problem: if we want one transformer to handle both text and images, we need an image tokenizer to turn pixels into discrete symbols and an image de-tokenizer to turn those symbols back into pixels.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Autoregressive models generate one unit at a time, VAEs compress into a latent then decode, GANs learn to fool a discriminator, and diffusion learns to reverse a noising process. The lecture then focuses on the autoregressive route because it is the most naturally compatible with language-model style token prediction.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>Lecture 11 only needed an image encoder because the output was text. Lecture 12 cares about image generation, so it needs both directions: image → tokens and tokens → image.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Intuition</strong>
+                <p>The dream is “remove modality-specific bridges.” If text and image can both be represented as sequences of discrete symbols, one transformer can model them in a unified way.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The lecture is not claiming autoregression is the best way to generate photorealistic images overall. It is claiming autoregression is the cleanest way to unify text and image under one token-prediction interface.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-12-pixels">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 13-19</span>
+              <span class="tag accent">Attempt 1</span>
+              <span class="tag blue">Pixel autoregression</span>
+            </div>
+            <h3>The most direct approach is to treat an image as a very long sequence of pixel values, but that simplicity becomes the main problem</h3>
+            <p>
+              The first attempt is pure language-model thinking: linearize the image into a sequence of pixel or channel values and train with maximum likelihood.
+              If \(x_{\mathrm{img}} \in \mathbb{R}^{H \times W \times C}\), we convert it into a sequence \(x_1, \dots, x_T\) and model each element with
+              \(p_\theta(x_t \mid x_{<t})\).
+              PixelRNN, Image Transformer, and iGPT are all examples of this same idea at different scales and with different architectures.
+            </p>
+            <div class="formula-box">
+              <p>The core recipe is just language modeling applied to pixels:</p>
+              <p>\[
+                x_{\mathrm{img}} \rightarrow x_1, \dots, x_T,
+                \qquad
+                x_t \in \{1, \dots, 256\},
+                \qquad
+                \mathcal{L}_{\mathrm{MLE}} = \sum_{t=1}^{T} -\log p_\theta(x_t \mid x_{<t}).
+              \]</p>
+              <p>For a \(1024 \times 1024\) RGB image, \(T \approx 1024 \cdot 1024 \cdot 3 = 3{,}145{,}728\) predicted values. That is why the sequence-length challenge is not a footnote; it dominates the design.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why it struggles</strong>
+                <p>Sequence length is enormous, and each individual pixel value carries very little semantic meaning compared with a word token. The model spends huge effort modeling low-level local detail before it can capture high-level structure.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>A single word can carry a concept like “bridge” or “zebra.” A single pixel mostly says “this one color channel is slightly brighter here.” That means semantic understanding is spread across many more positions.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What the example slides add</strong>
+                <p>PixelRNN, Image Transformer, and iGPT show that the recipe is real and can scale, but the lecture groups them to make one point: practical pixel-level generation typically needs special attention patterns or very large compute because the raw sequence is too long.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why raw-pixel autoregression is unattractive, say both pieces: it creates extremely long sequences and the tokens are semantically weak, so learning becomes expensive and data-hungry.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-12-vae">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 21-29</span>
+              <span class="tag accent">VAE bridge</span>
+              <span class="tag violet">Latent-variable view</span>
+            </div>
+            <h3>Before we can discretize images, the lecture briefly reviews the continuous-latent compression story behind VAEs</h3>
+            <p>
+              The VAE slides matter because VQ-VAE is easier to understand if you first remember what a standard VAE is doing.
+              A VAE assumes data is generated from a latent variable \(z\): sample \(z \sim p(z)\), then decode it into an image through \(p_{\theta_{\mathrm{dec}}}(x \mid z)\).
+              Training uses an encoder \(q_{\theta_{\mathrm{enc}}}(z \mid x)\) to approximate the posterior over latents and balances faithful reconstruction against keeping the latent space close to a simple prior.
+            </p>
+            <div class="formula-box">
+              <p>The standard objective is:</p>
+              <p>\[
+                \mathcal{L}_{\mathrm{VAE}}(x) =
+                -\mathbb{E}_{q_{\theta_{\mathrm{enc}}}(z \mid x)}[\log p_{\theta_{\mathrm{dec}}}(x \mid z)]
+                + D_{\mathrm{KL}}\!\left(q_{\theta_{\mathrm{enc}}}(z \mid x)\,\|\,p(z)\right).
+              \]</p>
+              <p>The first term says “reconstruct well.” The second says “do not let the encoder invent an arbitrary latent space that cannot be sampled from at generation time.”</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why the KL term exists</strong>
+                <p>Without regularization, the encoder could memorize the training set in an awkward latent geometry. Matching the encoder distribution to a simple prior such as \(p(z)=\mathcal{N}(0,I)\) makes sampling and generation possible.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Missing context</strong>
+                <p>The ELBO slide explains that this objective is a lower bound on \(\log p(x)\), and the reparameterization trick is what lets gradients flow through latent sampling during training. You do not usually need to reproduce the full derivation, but you should know what those phrases are doing there.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Why this is only a bridge</strong>
+                <p>A standard VAE gives a continuous latent representation. That is already useful for compression, but it is not yet the discrete token sequence a language-model-style transformer wants.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked how a VAE differs from pure autoregression, the clean answer is: it learns a latent bottleneck and reconstructs from it, rather than predicting every observed variable directly one step at a time.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-12-vqvae">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-12-multimodal-ii/slide-30-vq-vae-codebook.png" alt="Slide showing VQ-VAE quantization where the encoder output is replaced by the nearest learned codebook vector before decoding">
+              <figcaption>Slide 30. VQ-VAE replaces a continuous latent with the nearest learned codebook vector, which makes the latent representation discrete.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-12-multimodal-ii/slide-31-vq-vae-training.png" alt="Slide showing the VQ-VAE training objective with reconstruction, codebook update, and commitment terms plus a straight-through gradient estimator">
+              <figcaption>Slide 31. The training trick is the point most likely to be examined: nearest-neighbor lookup is discrete, so the model uses a straight-through estimator.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 29-33</span>
+              <span class="tag accent">VQ-VAE</span>
+              <span class="tag blue">Most testable Lecture 12 block</span>
+            </div>
+            <h3>VQ-VAE turns “compress the image” into “pick entries from a learned visual vocabulary”</h3>
+            <p>
+              VQ-VAE keeps the encoder-decoder structure but changes the latent space from continuous to discrete.
+              The encoder first produces a continuous vector \(z_e(x)\).
+              A quantizer then compares \(z_e(x)\) to a learned codebook \(\{e_1, \dots, e_K\}\) and replaces it with the nearest codebook vector.
+              The decoder reconstructs the image from that quantized representation, and the codebook index becomes a token that a transformer can model later.
+            </p>
+            <div class="formula-box">
+              <p>The quantization step is the key equation to know:</p>
+              <p>\[
+                k^* = \arg\min_{j \in \{1,\dots,K\}} \lVert z_e(x) - e_j \rVert_2,
+                \qquad
+                z_q(x) = e_{k^*}.
+              \]</p>
+              <p>This is why the model produces discrete image tokens: each local latent gets replaced by a codebook entry index.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why the straight-through estimator is needed</strong>
+                <p>The nearest-neighbor lookup uses an <code>argmin</code>, which is discrete and non-differentiable. The straight-through estimator lets decoder gradients act as if the quantization step were copied through, so the encoder still learns.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>What the loss terms are doing</strong>
+                <p>One term rewards good reconstruction. A second term moves codebook entries toward encoder outputs. A third “commitment” term discourages the encoder from wandering arbitrarily instead of settling near one codebook vector.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Intuition</strong>
+                <p>A standard VAE says “compress into a point in continuous space.” VQ-VAE says “compress into a sequence of visual dictionary entries.” That makes the output much easier to hand off to a token model.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The codebook indices are not human-interpretable class labels. They are learned discrete building blocks chosen because they help reconstruction, not because each one corresponds to a named semantic concept.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-12-vqgan">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-12-multimodal-ii/slide-35-vq-gan-objective.png" alt="Slide showing the VQ-GAN encoder-decoder trained with a GAN discriminator objective">
+              <figcaption>Slides 34-35. VQ-GAN keeps the discrete tokenizer idea but improves reconstructions using adversarial and perceptual signals.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-12-multimodal-ii/slide-36-vq-gan-transformer.png" alt="Slide showing how VQ-GAN tokenizes images and then trains an autoregressive transformer on the resulting discrete token sequence">
+              <figcaption>Slide 36. The token-count reduction is the practical win: a transformer over 1024 image tokens is far easier than one over tens of thousands of raw pixels.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 34-39</span>
+              <span class="tag accent">VQ-GAN</span>
+              <span class="tag success">Practical image tokens</span>
+            </div>
+            <h3>VQ-GAN makes the discrete-token idea more visually useful by improving the tokenizer and then training a transformer on the resulting tokens</h3>
+            <p>
+              The lecture’s VQ-GAN section modifies the VQ-VAE objective by adding GAN-style and perceptual losses.
+              The goal is not just to reconstruct the right average pixels, but to produce sharper, more realistic reconstructions that preserve perceptually important structure.
+              Once the tokenizer and de-tokenizer are trained, we can tokenize a large image dataset and train a standard autoregressive transformer on the discrete image-token sequences.
+            </p>
+            <div class="formula-box">
+              <p>The scaling benefit is the simplest thing to remember:</p>
+              <p>\[
+                32 \times 32 = 1024
+                \qquad\text{versus}\qquad
+                256 \times 256 = 65{,}536.
+              \]</p>
+              <p>If the tokenizer turns an image into a \(32 \times 32\) grid of codes, the transformer sees about sixty-four times fewer positions than raw \(256 \times 256\) pixels.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What VQ-GAN adds beyond VQ-VAE</strong>
+                <p>VQ-VAE gives discrete latents; VQ-GAN tries to make those latents reconstruct images that look better to humans. The adversarial and perceptual terms target visual fidelity that plain reconstruction losses often miss.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters for multimodal modeling</strong>
+                <p>A poor tokenizer is a poor vocabulary. If the code sequence throws away important visual detail, the downstream transformer can never recover it no matter how strong the language model is.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What the example-heavy slides imply</strong>
+                <p>The output slides are there to show that better tokenizers matter. The lecture does not need you to memorize specific images; it wants you to see why perceptual quality of the tokenizer/de-tokenizer directly affects the final generative system.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why VQ-GAN helps, say: it preserves the discrete-token interface of VQ-VAE but uses stronger image-quality objectives so the resulting tokens are a better substrate for transformer-based generation.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-12-unified">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 39-43</span>
+              <span class="tag accent">Unified models</span>
+              <span class="tag violet">DALL-E and Chameleon</span>
+            </div>
+            <h3>The endgame is a unified autoregressive model where text and image codes share one token-prediction framework</h3>
+            <p>
+              After learning a tokenizer and de-tokenizer, the lecture’s recipe is straightforward: add image tokens to the language model vocabulary, then train or fine-tune the model on sequences containing both text and image tokens.
+              DALL-E and Chameleon are examples of this idea.
+              The attraction is conceptual simplicity: one autoregressive model, one next-token objective, and a unified way to do multi-to-text, multi-to-image, or multi-to-multi generation.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is elegant</strong>
+                <p>Everything becomes next-token prediction. The model does not need one objective for text and a completely different one for images once both modalities share a discrete token interface.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Main cost</strong>
+                <p>The tokenizer becomes a bottleneck. If it throws away information or introduces artifacts, the autoregressive model inherits that loss. This is the lecture’s main warning about the “everything is tokens” view.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Why Chameleon appears here</strong>
+                <p>Chameleon shows this recipe is not just a historical curiosity. Even in 2024, large multimodal systems can still be built by first learning a visual tokenizer and then scaling a transformer over the resulting token stream.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Big-picture takeaway</strong>
+                <p>The lecture closes by saying this approach is useful and conceptually clean, but not the final word on state-of-the-art image quality. That is why the final slide points toward diffusion next.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-12-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the Lecture 12 terms most worth being able to explain quickly and precisely.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>Image tokenizer</strong>
+          <p>A model that maps an image into a sequence or grid of discrete codes so a transformer can model it as tokens.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Image de-tokenizer</strong>
+          <p>The decoder that turns discrete image codes back into pixels, enabling actual image generation.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Latent variable</strong>
+          <p>A hidden representation \(z\) that an encoder infers from the image and a decoder uses to reconstruct or generate it.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Prior</strong>
+          <p>The distribution \(p(z)\) we want latent samples to follow so generation from sampled latents is possible.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Codebook</strong>
+          <p>The learned set of vectors in VQ-VAE. Each encoder output is replaced by its nearest codebook entry.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Quantization</strong>
+          <p>The step that replaces a continuous latent vector with a discrete codebook choice.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Straight-through estimator</strong>
+          <p>A training trick that lets gradients pass through a discrete lookup as if it were continuous enough for backpropagation.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Perceptual loss</strong>
+          <p>A loss that encourages reconstructions to preserve higher-level visual similarity, not just raw pixel-by-pixel accuracy.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Lecture 12 is about generation, so it needs both an image tokenizer and an image de-tokenizer.</li>
+            <li>Raw-pixel autoregression is conceptually simple but suffers from massive sequence length and weak per-token semantics.</li>
+            <li>VAEs introduce the compression story: reconstruct well, but keep the latent space sampleable through a prior.</li>
+            <li>VQ-VAE discretizes the latent space with a codebook, which creates image tokens a transformer can model.</li>
+            <li>VQ-GAN improves the perceptual quality of those tokens, enabling stronger autoregressive token-based image generation.</li>
+            <li>Unified token models are elegant, but they inherit information loss from the tokenizer and are not the final answer for best image quality.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>What is most likely to be tested</strong>
+          <ul>
+            <li>Why pixel-level autoregression is computationally and statistically hard.</li>
+            <li>The two parts of the VAE objective and what each one is trying to enforce.</li>
+            <li>The VQ-VAE quantization rule and why non-differentiability forces the straight-through trick.</li>
+            <li>Why VQ-GAN is better thought of as “better visual tokenization” rather than a completely separate transformer objective.</li>
+            <li>The main pro and con of treating images and text under one autoregressive token interface.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-12-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>Why does a \(1024 \times 1024\) RGB image make raw autoregressive modeling so expensive?</li>
+            <li>In a standard VAE, what jobs are done by the reconstruction term and the KL term?</li>
+            <li>In VQ-VAE, what exactly is being quantized, and what discrete object comes out?</li>
+            <li>Why is the straight-through gradient estimator needed in VQ-VAE training?</li>
+            <li>What does VQ-GAN add beyond VQ-VAE, and why should that help downstream generation?</li>
+            <li>Why are unified text-plus-image autoregressive models attractive, and what bottleneck do they inherit?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
     <div class="footer">
-      This site now covers <code>anlp-s2026-11-multimodal.pdf</code> in a lecture-by-lecture scaffold that can grow over time. The active lecture lives at the root <code>index.html</code>, uses shared assets under <code>assets/</code>, and is ready for additional lecture tabs and sections later.
+      This site now covers <code>anlp-s2026-11-multimodal.pdf</code> and <code>anlp-s2026-12-multimodal-ii.pdf</code> in one reusable lecture-by-lecture scaffold.
+      The shared root <code>index.html</code>, shared assets under <code>assets/</code>, and tabbed lecture panels are set up so future lecture companions can plug into the same structure cleanly.
     </div>
   </main>
 </body>

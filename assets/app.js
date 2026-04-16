@@ -1,40 +1,69 @@
 (function () {
-  const lectureTabs = document.querySelectorAll('[data-lecture-tab]');
-  const lecturePanels = document.querySelectorAll('[data-lecture-panel]');
-  const jumpLinks = document.querySelectorAll('.jump-grid a[href^="#"]');
+  const lectureTabs = [...document.querySelectorAll('[data-lecture-tab]')];
+  const lecturePanels = [...document.querySelectorAll('[data-lecture-panel]')];
+  const allJumpLinks = [...document.querySelectorAll('.jump-grid a[href^="#"]')];
+  let jumpObserver = null;
 
-  function syncLectureTabs() {
-    const hash = window.location.hash || '#lecture-11-multimodal';
-    let activePanel = null;
+  function getHashId() {
+    return decodeURIComponent((window.location.hash || '').replace(/^#/, ''));
+  }
 
-    lecturePanels.forEach((panel) => {
-      if (hash === '#' + panel.id || hash.startsWith('#' + panel.id + '-')) {
-        activePanel = panel.id;
-      }
-    });
-
-    if (!activePanel && lecturePanels.length > 0) {
-      activePanel = lecturePanels[0].id;
+  function getActivePanelId() {
+    const hashId = getHashId();
+    if (!hashId) {
+      return lecturePanels[0] ? lecturePanels[0].id : null;
     }
 
-    lectureTabs.forEach((tab) => {
-      const isActive = tab.dataset.lectureTab === activePanel;
-      tab.classList.toggle('active', isActive);
-      tab.classList.toggle('inactive', !isActive);
-      if (isActive) {
-        tab.setAttribute('aria-current', 'page');
+    const directPanel = lecturePanels.find((panel) => panel.id === hashId);
+    if (directPanel) {
+      return directPanel.id;
+    }
+
+    const target = document.getElementById(hashId);
+    if (target) {
+      const parentPanel = target.closest('[data-lecture-panel]');
+      if (parentPanel) {
+        return parentPanel.id;
+      }
+    }
+
+    return lecturePanels[0] ? lecturePanels[0].id : null;
+  }
+
+  function setCurrentJumpLink(links, currentId) {
+    links.forEach((link) => {
+      const isCurrent = currentId && link.getAttribute('href') === '#' + currentId;
+      link.classList.toggle('current', Boolean(isCurrent));
+      if (isCurrent) {
+        link.setAttribute('aria-current', 'location');
       } else {
-        tab.removeAttribute('aria-current');
+        link.removeAttribute('aria-current');
       }
     });
   }
 
-  function syncJumpLinks() {
-    if (!('IntersectionObserver' in window) || jumpLinks.length === 0) {
+  function syncJumpLinks(activePanelId) {
+    if (jumpObserver) {
+      jumpObserver.disconnect();
+      jumpObserver = null;
+    }
+
+    setCurrentJumpLink(allJumpLinks, null);
+
+    const activePanel = document.getElementById(activePanelId);
+    if (!activePanel) {
       return;
     }
 
-    const targets = [...jumpLinks]
+    const activeJumpLinks = [...activePanel.querySelectorAll('.jump-grid a[href^="#"]')];
+    const hashId = getHashId();
+    setCurrentJumpLink(activeJumpLinks, hashId);
+
+    if (!('IntersectionObserver' in window) || activeJumpLinks.length === 0) {
+      return;
+    }
+
+    const targets = activeJumpLinks
       .map((link) => document.querySelector(link.getAttribute('href')))
       .filter(Boolean);
 
@@ -42,13 +71,7 @@
       return;
     }
 
-    const linkById = new Map();
-    jumpLinks.forEach((link) => {
-      const id = link.getAttribute('href').slice(1);
-      linkById.set(id, link);
-    });
-
-    const observer = new IntersectionObserver((entries) => {
+    jumpObserver = new IntersectionObserver((entries) => {
       const visible = entries
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
@@ -57,25 +80,36 @@
         return;
       }
 
-      const currentId = visible[0].target.id;
-      jumpLinks.forEach((link) => {
-        const isCurrent = link.getAttribute('href') === '#' + currentId;
-        link.classList.toggle('current', isCurrent);
-        if (isCurrent) {
-          link.setAttribute('aria-current', 'location');
-        } else {
-          link.removeAttribute('aria-current');
-        }
-      });
+      setCurrentJumpLink(activeJumpLinks, visible[0].target.id);
     }, {
       rootMargin: '-18% 0px -55% 0px',
       threshold: [0.2, 0.45, 0.7]
     });
 
-    targets.forEach((target) => observer.observe(target));
+    targets.forEach((target) => jumpObserver.observe(target));
   }
 
-  window.addEventListener('hashchange', syncLectureTabs);
-  syncLectureTabs();
-  syncJumpLinks();
+  function syncLecturePanels() {
+    const activePanelId = getActivePanelId();
+
+    lectureTabs.forEach((tab) => {
+      const isActive = tab.dataset.lectureTab === activePanelId;
+      tab.classList.toggle('active', isActive);
+      tab.classList.toggle('inactive', !isActive);
+      if (isActive) {
+        tab.setAttribute('aria-current', 'page');
+      } else {
+        tab.removeAttribute('aria-current');
+      }
+    });
+
+    lecturePanels.forEach((panel) => {
+      panel.hidden = panel.id !== activePanelId;
+    });
+
+    syncJumpLinks(activePanelId);
+  }
+
+  window.addEventListener('hashchange', syncLecturePanels);
+  syncLecturePanels();
 }());

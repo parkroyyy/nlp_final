@@ -116,7 +116,7 @@ h3 {
 
 h1 {
   margin-top: 0.8rem;
-  max-width: 12ch;
+  max-width: 16ch;
   font-size: clamp(1.84rem, 3vw, 3rem);
 }
 
@@ -181,6 +181,22 @@ h3 {
   gap: 0.75rem;
   flex-wrap: wrap;
   margin: 1.35rem 0 1rem;
+}
+
+.lecture-panel {
+  scroll-margin-top: 1rem;
+}
+
+.lecture-header {
+  margin: 0.3rem 0 1rem;
+}
+
+.lecture-header .eyebrow {
+  margin-bottom: 0.75rem;
+}
+
+.lecture-header h2 {
+  margin-top: 0.85rem;
 }
 
 .lecture-tab {
