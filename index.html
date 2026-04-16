@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ANLP Study Partner</title>
+  <title>ANLP Lecture Companions</title>
   <link rel="stylesheet" href="assets/styles.css">
   <script>
     window.MathJax = {
@@ -23,11 +23,11 @@
   <main class="shell">
     <section class="hero">
       <span class="eyebrow">ANLP Spring 2026 · Study Partner</span>
-      <h1>Multimodal Modeling Companions</h1>
+      <h1>ANLP Lecture Companions</h1>
       <p>
-        This companion now covers both multimodal lectures in the repo’s shared HTML study site.
+        This companion now covers four lecture decks in the repo’s shared HTML study site.
         It is written for a student who missed class and needs the missing connective tissue the slides assume:
-        what the models are doing, why the engineering choices make sense, where the hidden tradeoffs are,
+        what the models are optimizing, why the engineering choices make sense, where the hidden tradeoffs are,
         and which concepts are most likely to show up on a quiz or final.
       </p>
       <div class="hero-grid">
@@ -40,8 +40,16 @@
           <p>The second lecture flips the direction. To generate images with a language-model-like system, we need an image tokenizer, an image de-tokenizer, and a way to model image tokens autoregressively.</p>
         </article>
         <article class="hero-card">
+          <strong>Lecture 15 focus</strong>
+          <p>The third lecture pivots to modern image generation: diffusion noising and denoising, score-based interpretations, guidance, continuous-time samplers, and why Stable Diffusion 3 uses flow matching in latent space.</p>
+        </article>
+        <article class="hero-card">
+          <strong>Lecture 16 focus</strong>
+          <p>The fourth lecture explains why language-model imitation learning is not enough for reward-driven tasks, then builds the RL toolkit the course keeps reusing: MDPs, REINFORCE, discounting, baselines, advantages, and PPO.</p>
+        </article>
+        <article class="hero-card">
           <strong>Quiz-calibrated style</strong>
-          <p>The quiz answer keys suggest the course rewards mechanism-level reasoning more than paper-name recall, so the notes below prioritize objectives, scaling arguments, and what changes when a design choice changes.</p>
+          <p>The quiz answer keys suggest the course rewards mechanism-level reasoning more than paper-name recall, so the notes below prioritize objectives, estimators, scaling arguments, and what changes when a design choice changes.</p>
         </article>
       </div>
     </section>
@@ -49,6 +57,8 @@
     <nav class="lecture-tabs" aria-label="Lecture tabs">
       <a class="lecture-tab active" data-lecture-tab="lecture-11-multimodal" href="#lecture-11-multimodal">Lecture 11 · Multimodal I</a>
       <a class="lecture-tab inactive" data-lecture-tab="lecture-12-multimodal-ii" href="#lecture-12-multimodal-ii">Lecture 12 · Multimodal II</a>
+      <a class="lecture-tab inactive" data-lecture-tab="lecture-15-multimodal-iii" href="#lecture-15-multimodal-iii">Lecture 15 · Multimodal III</a>
+      <a class="lecture-tab inactive" data-lecture-tab="lecture-16-rl" href="#lecture-16-rl">Lecture 16 · RL</a>
     </nav>
 
     <section class="lecture-panel" id="lecture-11-multimodal" data-lecture-panel="lecture-11-multimodal">
@@ -839,8 +849,843 @@
       </div>
     </section>
 
+    <section class="lecture-panel" id="lecture-15-multimodal-iii" data-lecture-panel="lecture-15-multimodal-iii">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 15</span>
+        <h2>Multimodal Modeling III</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-15-multimodal-iii.pdf</code> into the diffusion-and-flow ideas a missed-lecture student actually needs:
+          the Gaussian forward and learned reverse processes, the practical noise-prediction objective, why predicting noise means learning a score function,
+          how guidance makes conditioning work in practice, which engineering tricks make diffusion usable at scale, and what flow matching changes in the Stable Diffusion 3 era.
+        </p>
+      </div>
+
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        Lecture 15 completes the multimodal arc by explaining why modern image generation often leaves the discrete-token route behind.
+        It starts with the fixed Gaussian noising process, derives the practical denoising objective, explains why that objective implicitly learns the score function,
+        shows how conditioning and guidance steer samples, then moves to continuous-time views and flow matching as the cleaner transport-based story behind systems like Stable Diffusion 3.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Write the forward-process and direct-sampling equations and explain the role of \(\alpha_t\) and \(\bar{\alpha}_t\).</li>
+            <li>Explain why the practical DDPM loss is “sample a timestep, add noise, predict that noise.”</li>
+            <li>Explain why predicting \(\epsilon\) is useful: it implicitly estimates the score \(\nabla_z \log p_t(z)\).</li>
+            <li>Reason about what happens if training overweights large timesteps: better coarse denoising, worse fine detail.</li>
+            <li>Explain classifier-free guidance and what the guidance scale \(w\) is doing.</li>
+            <li>Compare DDPM and flow matching in terms of path, process type, prediction target, and typical number of steps.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 1-4, 20-21, and 41-43 are title, framing, code, or closing slides, so they are folded into the retained study blocks instead of treated separately.</li>
+            <li>Slides 5-9 become one diffusion-setup block because the equations, noise schedule, and dog-to-noise graphic all support the same core idea.</li>
+            <li>Slides 10-19 and 22-25 are compressed into one training block because the ELBO, simplified loss, score connection, and sampling loop are one mechanism story.</li>
+            <li>Slides 27-31 are merged into one guidance block; the example images are summarized as evidence that guidance changes prompt adherence rather than memorization targets.</li>
+            <li>Slides 32-35 are grouped as one extensions block, and slides 36-40 become one flow-matching block with Stable Diffusion 3 as the case study rather than a separate paper-summary section.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_4_answer_key.pdf</code> directly tests why predicting \(\epsilon\) matters and what happens when you oversample large \(t\), so those ideas are treated as high-priority rather than side remarks.</li>
+            <li><code>ANLP_quiz_3_answer_key.pdf</code> reinforces that this course likes mechanism-level reasoning, not just paper-name recall, which is why the formulas below always come with design implications.</li>
+            <li><code>ANLP_quiz_5_answer_key.pdf</code> shows the course also likes “what bottleneck does this technique attack?” questions, so the extensions section is organized around cost, architecture, and sampling speed rather than chronology.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-15-setup">Setup</a>
+        <a href="#lecture-15-training">Training</a>
+        <a href="#lecture-15-guidance">Guidance</a>
+        <a href="#lecture-15-extensions">Extensions</a>
+        <a href="#lecture-15-flow">Flow Matching</a>
+        <a href="#lecture-15-glossary">Glossary</a>
+        <a href="#lecture-15-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card jump-target" id="lecture-15-setup">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-15-multimodal-iii/slide-05-diffusion-core-idea.png" alt="Slide showing diffusion as a forward process that gradually adds noise to an image and a reverse process that denoises from pure noise back to data">
+            <figcaption>Slides 5-9. The picture is simple on purpose: diffusion generation is “destroy data with a fixed noising process, then learn to reverse it.”</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 2-9</span>
+              <span class="tag accent">Diffusion setup</span>
+              <span class="tag blue">Foundational</span>
+            </div>
+            <h3>Diffusion replaces “predict the next token” with “iteratively denoise a corrupted sample”</h3>
+            <p>
+              The lecture’s first big move is conceptual, not algebraic.
+              Lecture 12 tried to make image generation look like language modeling by discretizing images into tokens.
+              Lecture 15 instead keeps images in a continuous space and says: define a fixed forward process \(q\) that gradually turns data \(x_0\) into noise \(x_T\), then learn a reverse process \(p_\theta\) that undoes those steps.
+              This is why modern text-to-image systems feel so different from token-based autoregressive image models: they generate by iterative refinement, not by committing to one token at a time.
+            </p>
+            <div class="formula-box">
+              <p>The Gaussian forward process and its direct-sampling shortcut are the key equations to know.</p>
+              <p>\[
+                q(x_t \mid x_{t-1}) = \mathcal{N}\!\left(x_t; \sqrt{\alpha_t}\,x_{t-1}, (1-\alpha_t)I\right),
+                \qquad
+                q(x_t \mid x_0) = \mathcal{N}\!\left(x_t; \sqrt{\bar{\alpha}_t}\,x_0, (1-\bar{\alpha}_t)I\right)
+              \]</p>
+              <p>\[
+                \bar{\alpha}_t = \prod_{i=1}^{t}\alpha_i,
+                \qquad
+                x_t = \sqrt{\bar{\alpha}_t}\,x_0 + \sqrt{1-\bar{\alpha}_t}\,\epsilon,
+                \qquad
+                \epsilon \sim \mathcal{N}(0,I).
+              \]</p>
+              <p>The schedule is chosen so that \(\bar{\alpha}_0 = 1\), \(\bar{\alpha}_T \approx 0\), and noise increases smoothly over time.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>The forward process is fixed and easy to sample from; the reverse process is the thing we train. Keeping those roles separate is the first important mental checkpoint.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>Training becomes a collection of easier denoising problems at different noise levels instead of a single impossible jump from random noise straight to a high-resolution image.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Missing context</strong>
+                <p>The direct formula for \(x_t\) is what makes diffusion practical. It means training can jump to any timestep \(t\) in one shot instead of simulating every earlier noising step.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The noise schedule is not learned from scratch in the basic lecture setup. What the model learns is how to reverse the chosen corruption process.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-15-training">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 10-19, 22-25</span>
+              <span class="tag accent">Training and score view</span>
+              <span class="tag blue">Most testable Lecture 15 block</span>
+            </div>
+            <h3>The practical training rule is simple: sample a timestep, add known noise, and train the network to predict exactly that noise</h3>
+            <p>
+              The slides briefly derive training from an ELBO, decomposing it into prior matching, denoising, and reconstruction terms.
+              But the lecture’s real punchline is that, under the Gaussian setup, the messy variational story collapses into a very clean objective:
+              choose a random timestep \(t\), sample noise \(\epsilon\), construct \(x_t\), and regress onto the injected noise.
+              That is the operational recipe students actually need to remember.
+            </p>
+            <div class="formula-box">
+              <p>The conceptual ELBO split is:</p>
+              <p>\[
+                L = L_T + \sum_{t=2}^{T} L_{t-1} + L_0
+              \]</p>
+              <p>where \(L_T\) is prior matching, \(L_{t-1}\) is denoising, and \(L_0\) is reconstruction. In practice, the lecture reduces this to:</p>
+              <p>\[
+                L_{\mathrm{simple}}(\theta) =
+                \mathbb{E}_{t, x_0, \epsilon}\!\left[\left\|\epsilon - \hat{\epsilon}_\theta(x_t, t)\right\|_2^2\right],
+                \qquad
+                x_t = \sqrt{\bar{\alpha}_t}\,x_0 + \sqrt{1-\bar{\alpha}_t}\,\epsilon.
+              \]</p>
+              <p>Because the optimal predictor estimates the expected noise, the model also learns the score:
+              \[
+                \hat{\epsilon}_\theta(z_t, t) \approx -\sigma_t \nabla_{z_t}\log p_t(z).
+              \]</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why the \(\epsilon\)-loss is such a big deal</strong>
+                <p>It turns the reverse step into plain supervised regression. The model is not asked to output a full image distribution directly; it is asked to identify the corruption that was applied.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why predicting noise is especially useful</strong>
+                <p>Quiz 4 highlights the key reason: the noise predictor is also a score estimator. That is what later continuous-time SDE and ODE formulations plug into.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Quiz-aligned timestep warning</strong>
+                <p>If you oversample large \(t\) values, the model sees more heavily corrupted inputs. That usually helps coarse denoising but weakens learning on fine-detail steps near the data manifold.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Sampling loop to remember</strong>
+                <p>At generation time, start from \(x_T \sim \mathcal{N}(0,I)\), then repeatedly use the denoiser inside the reverse Gaussian transition until you land near \(x_0\).</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-15-guidance">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-15-multimodal-iii/slide-29-classifier-free-guidance.png" alt="Slide showing classifier-free guidance, where a conditional and unconditional prediction are combined with guidance scale w">
+            <figcaption>Slides 28-31. Classifier-free guidance is the practical conditioning trick most students should expect to talk about, even though the lecture first motivates it through classifier guidance.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 27-31</span>
+              <span class="tag accent">Guidance</span>
+              <span class="tag violet">Conditional generation</span>
+            </div>
+            <h3>Conditioning works by steering denoising toward samples that both look plausible and match the prompt</h3>
+            <p>
+              After the score interpretation is in place, conditional generation becomes much easier to describe.
+              The lecture first introduces classifier guidance: add a classifier gradient that rewards samples likely to belong to class \(c\).
+              It then moves to classifier-free guidance (CFG), which is the version used far more often in practice because it avoids training a separate classifier.
+              The model is trained both with and without conditioning, and at sampling time the two predictions are combined to amplify the conditioning signal.
+            </p>
+            <div class="formula-box">
+              <p>The CFG formula worth memorizing is:</p>
+              <p>\[
+                \tilde{\epsilon}_\theta(z_t, c) = (1+w)\epsilon_\theta(z_t, c) - w\epsilon_\theta(z_t).
+              \]</p>
+              <p>The unconditional branch says “what looks like a valid image here?” The conditional branch says “what matches prompt \(c\) here?” The guidance scale \(w\) extrapolates in the prompt-following direction.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Classifier guidance adds an explicit classifier gradient; classifier-free guidance bakes the same idea into one diffusion model by contrasting conditioned and unconditioned predictions.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>This is the mechanism behind the familiar “prompt adherence versus naturalness/diversity” tradeoff in modern text-to-image systems.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Intuition</strong>
+                <p>The unconditional model keeps the sample on the manifold of realistic images. The conditioned model pulls the sample toward the requested concept. CFG leans harder in that conditioned direction.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Bigger \(w\) is not automatically better. Too much guidance can reduce diversity, over-sharpen artifacts, or push samples toward brittle prompt satisfaction.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-15-extensions">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-15-multimodal-iii/slide-32-other-extensions.png" alt="Slide summarizing diffusion extensions including latent diffusion, diffusion transformers, deterministic sampling with ODE solvers, and distillation">
+            <figcaption>Slides 32-35. The lecture organizes diffusion improvements by bottleneck: state size, architecture, stochasticity, and step count.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 32-35</span>
+              <span class="tag accent">Extensions</span>
+              <span class="tag success">Practical system design</span>
+            </div>
+            <h3>Once diffusion is viewed as score-based dynamics, the main engineering question becomes which bottleneck you want to attack</h3>
+            <p>
+              The “other extensions” table is one of the most useful compression slides in the whole deck.
+              It says the major improvements are not random tricks.
+              Latent diffusion attacks state size by moving diffusion into an autoencoder latent space.
+              DiT changes the backbone from U-Net-style convolutions to a transformer.
+              Deterministic samplers come from the continuous-time probability-flow ODE view.
+              Distillation attacks the remaining bottleneck: too many denoising steps at inference time.
+            </p>
+            <div class="formula-box">
+              <p>The continuous-time step that unlocks deterministic samplers is the probability-flow ODE:</p>
+              <p>\[
+                dz = \left[f(t)z - \frac{1}{2}g(t)^2 \nabla_z \log p_t(z)\right]dt.
+              \]</p>
+              <p>It has the same marginals as the diffusion SDE, but it is deterministic, which is why ODE solvers and related fast samplers even make sense.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why latent diffusion matters</strong>
+                <p>Pixel space is too large and too expensive. Compressing into an autoencoder latent makes diffusion feasible at the resolutions modern image models care about.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Best way to remember the table</strong>
+                <p>Latent diffusion reduces state size, DiT changes architecture, deterministic solvers reduce sampling randomness and steps, and distillation teaches a student to imitate many denoising steps in far fewer.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Missing context</strong>
+                <p>The continuous-time score view is the bridge between “predict \(\epsilon\)” and “solve an ODE.” That bridge is why the lecture spends time on score functions at all.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why predicting \(\epsilon\) is useful beyond the training loss, say: it gives the score term needed by score-based SDE/ODE samplers and therefore by many fast-diffusion variants.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-15-flow">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-15-multimodal-iii/slide-38-flow-matching.png" alt="Slide introducing flow matching with a straight-line conditional path and a velocity-matching loss">
+              <figcaption>Slide 38. Flow matching chooses a path and directly learns the velocity field that transports samples along it.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-15-multimodal-iii/slide-39-ddpm-vs-flow-matching.png" alt="Slide comparing DDPM and flow matching in terms of stochastic versus deterministic processes, noise versus velocity prediction, and typical number of steps">
+              <figcaption>Slides 39-40. The comparison slide is the exam-friendly one: DDPM predicts noise along a stochastic diffusion path, while flow matching predicts velocity along an ODE path that is often easier to solve in fewer steps.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 36-40</span>
+              <span class="tag accent">Flow matching</span>
+              <span class="tag blue">Modern direction</span>
+            </div>
+            <h3>Flow matching changes the learning target from “undo this diffusion step” to “predict the velocity that moves samples from noise toward data”</h3>
+            <p>
+              The lecture’s last idea is not just “another sampler.”
+              Flow matching changes the object the model learns.
+              Instead of defining a stochastic reverse diffusion process and predicting noise, we define a path between an easy source distribution \(p_0\) and the data distribution \(p_1\), then train a model to predict the velocity field that carries samples along that path.
+              The straight-line conditional path is the simplest case, and it is enough to connect the lecture to Stable Diffusion 3.
+            </p>
+            <div class="formula-box">
+              <p>The straight-path conditional flow-matching equations are the ones to keep in memory:</p>
+              <p>\[
+                X_t = (1-t)X_0 + t x_1,
+                \qquad
+                \frac{d}{dt}X_t = x_1 - X_0,
+              \]</p>
+              <p>\[
+                \mathcal{L}_{\mathrm{CFM}} =
+                \mathbb{E}_{t, x_1, X_0}\!\left[\left\|v_\theta(X_t, t) - (x_1 - X_0)\right\|_2^2\right].
+              \]</p>
+              <p>The lecture’s key result is that this conditional objective gives the same optimum as the harder full flow-matching objective.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why it can be faster</strong>
+                <p>Flow matching learns a deterministic ODE with straighter paths, so numerical integration is often easier than reversing a long stochastic diffusion chain.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Exam comparison to keep straight</strong>
+                <p>DDPM: stochastic SDE-style process, curved diffusion path, predicts noise, typically many steps. Flow matching: deterministic ODE, chosen path, predicts velocity, often fewer steps.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Stable Diffusion 3 tie-in</strong>
+                <p>The case-study slide says SD3 combines flow-matching variants with latent-space modeling and strong text conditioning from CLIP and T5. The point is not to memorize the table values; it is to see where modern diffusion systems are heading.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>“Straight line” describes the chosen interpolation path in state space, not a promise that every perceptual trajectory is literally simple or that flow matching is automatically better in every setting.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-15-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the Lecture 15 terms most worth being able to define quickly and precisely.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>Forward process</strong>
+          <p>The fixed corruption process \(q\) that gradually turns data into noise.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Reverse process</strong>
+          <p>The learned process \(p_\theta\) that denoises from noise back toward data.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Noise schedule</strong>
+          <p>The choice of \(\alpha_t\), \(\beta_t\), or related coefficients that controls how quickly signal is destroyed across timesteps.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Score function</strong>
+          <p>The gradient \(\nabla_z \log p_t(z)\), which points toward higher probability density at timestep \(t\).</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Classifier-free guidance</strong>
+          <p>A conditioning trick that combines conditioned and unconditioned denoiser predictions to strengthen prompt adherence without a separate classifier.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Latent diffusion</strong>
+          <p>Running diffusion in the latent space of an autoencoder rather than directly in pixel space.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Probability-flow ODE</strong>
+          <p>A deterministic ODE with the same marginals as the diffusion SDE, enabling ODE-based samplers.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Flow matching</strong>
+          <p>A training framework that learns a velocity field transporting samples from an easy distribution to the data distribution.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Diffusion generation defines a fixed noising process and learns a reverse denoising process.</li>
+            <li>The Gaussian forward process lets training jump directly to any timestep using \(x_t = \sqrt{\bar{\alpha}_t}x_0 + \sqrt{1-\bar{\alpha}_t}\epsilon\).</li>
+            <li>The practical DDPM loss is noise prediction, and that same predictor implicitly estimates the score function.</li>
+            <li>Guidance makes conditional generation work by steering denoising toward samples that better match the prompt.</li>
+            <li>Latent diffusion, DiT, deterministic samplers, and distillation each attack different practical bottlenecks.</li>
+            <li>Flow matching reframes the problem as velocity prediction along a transport path and is a major part of the Stable Diffusion 3 story.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>What is most likely to be tested</strong>
+          <ul>
+            <li>Which parts of diffusion are fixed versus learned.</li>
+            <li>The direct-sampling equation for \(x_t\) and the meaning of \(\bar{\alpha}_t\).</li>
+            <li>Why the denoising loss can be written as an \(\epsilon\)-prediction objective.</li>
+            <li>Why predicting \(\epsilon\) is equivalent to learning the score function.</li>
+            <li>How classifier-free guidance combines conditional and unconditional predictions.</li>
+            <li>How DDPM and flow matching differ in prediction target, process type, and typical inference behavior.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-15-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>Why is it useful that \(x_t\) can be sampled directly from \(x_0\) rather than by simulating all earlier noising steps?</li>
+            <li>What do the three conceptual ELBO pieces \(L_T\), \(L_{t-1}\), and \(L_0\) correspond to?</li>
+            <li>Why does predicting \(\epsilon\) let DDPM implicitly learn the score function?</li>
+            <li>What is the practical effect of over-emphasizing very noisy timesteps during training?</li>
+            <li>In classifier-free guidance, what do \(\epsilon_\theta(z_t,c)\) and \(\epsilon_\theta(z_t)\) each contribute?</li>
+            <li>If a question asks “why might flow matching need fewer steps than DDPM?”, what concise comparison would you give?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="lecture-panel" id="lecture-16-rl" data-lecture-panel="lecture-16-rl">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 16</span>
+        <h2>Reinforcement Learning</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-16-rl.pdf</code> into the RL ideas a missed-lecture student actually needs:
+          why next-token imitation is mismatched to many real tasks, how to formalize generation as an MDP, what REINFORCE is really estimating,
+          and why practical LM RL almost always adds discounting, baselines or advantages, and PPO-style step control.
+        </p>
+      </div>
+
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        The deck starts by explaining why supervised fine-tuning can imitate data without directly optimizing the criterion we care about.
+        It then introduces the agent-environment loop, formalizes it with states, actions, rewards, and trajectories, derives vanilla policy gradient from the score-function trick,
+        and spends the second half on the three stabilizers that matter most in practice: discounting, baselines or advantages, and clipping updates with PPO.
+        The closing RLHF and RLVR slides are used here as context for why these ideas matter in language modeling, not as a separate lecture-within-the-lecture.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Explain the lecture’s three supervised-learning problems: task mismatch, data mismatch, and exposure bias.</li>
+            <li>Identify state, action, reward, return, and policy in a text-generation RL setup.</li>
+            <li>Distinguish environment state, observation, and agent state.</li>
+            <li>State REINFORCE in words and explain why the gradient uses action log-probabilities instead of \(\nabla_\theta R(\tau)\).</li>
+            <li>Explain why subtracting an action-independent baseline does not change the expected policy-gradient estimator.</li>
+            <li>Explain what discounting, advantage estimation, and PPO clipping are each trying to fix.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 2-12 become one motivation block because the recap and RL-introduction slides all support the same question: why is imitation learning not enough?</li>
+            <li>Slides 14-25 are compressed into one formal setup block and one language-model instantiation block instead of many tiny examples.</li>
+            <li>Slides 32-34 and 43 are code or demo slides, so they are summarized inside the algorithm sections rather than treated as standalone notes.</li>
+            <li>Slides 44-46 are kept only as a bridge showing that PPO and scalar rewards carry directly into RLHF and RLVR.</li>
+            <li>Appendix slides 48-50 are folded into the REINFORCE explanation so the derivation punchline is preserved without turning the page into proof notes.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_4_answer_key.pdf</code> already tests the constant-baseline fact directly, so the baseline section below emphasizes both unbiasedness and variance reduction.</li>
+            <li>The same quiz rewards “what happens if I change the training distribution or estimator?” reasoning, which is exactly the right lens for discounting, sparse rewards, and PPO step control.</li>
+            <li>The RLHF and RLVR questions in Quiz 4 suggest the course expects students to carry Lecture 16’s MDP, policy-gradient, and PPO ideas forward into LM-specific reward training.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-16-motivation">Motivation</a>
+        <a href="#lecture-16-mdp">MDP Setup</a>
+        <a href="#lecture-16-text-rl">Text as RL</a>
+        <a href="#lecture-16-reinforce">REINFORCE</a>
+        <a href="#lecture-16-stabilize">Stabilizing PG</a>
+        <a href="#lecture-16-ppo">PPO Bridge</a>
+        <a href="#lecture-16-glossary">Glossary</a>
+        <a href="#lecture-16-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card jump-target" id="lecture-16-motivation">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-16-rl/slide-08-rl-loop.png" alt="Slide showing the reinforcement learning loop where a model generates an answer, receives a reward, and updates toward the higher-reward completion">
+            <figcaption>Slides 4-12. The lecture’s starting point is not “RL is fashionable”; it is “next-token imitation misses the thing we actually care about.”</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 2-12</span>
+              <span class="tag accent">Why RL</span>
+              <span class="tag blue">LM motivation</span>
+            </div>
+            <h3>RL appears here because imitation learning is not the same thing as optimizing task success</h3>
+            <p>
+              The lecture first recaps supervised fine-tuning and maximum likelihood, then names three problems with using that recipe as the whole story for advanced LM behavior.
+              First, there is <em>task mismatch</em>: maximizing the probability of a likely response is not the same as maximizing helpfulness, correctness, harmlessness, or unit-test pass rate.
+              Second, there is <em>data mismatch</em>: the available text can contain buggy, toxic, or otherwise undesired behavior, and the exact outputs we want are often scarce.
+              Third, there is <em>exposure bias</em>: training conditions on gold prefixes, but test-time generation conditions on the model’s own mistakes.
+              Slides 8-12 then reframe the learning loop: generate behavior, score it with a reward, and update the model toward the better trajectories.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>RL replaces “imitate the provided output tokens” with “sample a trajectory, measure how good it was, and use that scalar feedback for learning.”</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>Many LM goals are sequence-level or task-level. A final answer can be correct even if it is not the most likely string in the dataset, and it can be wrong even if every local next-token choice looked plausible.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Missing context</strong>
+                <p>RL does not remove the need for careful supervision. It shifts the burden from “provide exact target outputs” to “design or learn a reward signal that really captures what you want.”</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked when RL is attractive, say: when the criterion we care about is easier to score at the trajectory level than to encode as token-level labels for every step.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-16-mdp">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 14-20, 25-26</span>
+              <span class="tag accent">MDP formalism</span>
+              <span class="tag blue">Foundational</span>
+            </div>
+            <h3>The formal language is an MDP: states, actions, transitions, rewards, policies, and returns</h3>
+            <p>
+              After the motivation, the lecture switches to the standard RL abstraction: an agent interacts with an environment over time.
+              At each step it receives information about the current situation, chooses an action, and gets a scalar reward.
+              The environment then transitions to a new state.
+              The full setup is summarized as a Markov Decision Process \((S, A, E, R)\), where \(S\) is the state space, \(A\) the action space,
+              \(E(s_{t+1}\mid s_t, a_t)\) the transition dynamics, and \(R(s_t, a_t)\) the reward function.
+              The agent acts according to a policy \(\pi(a_t\mid s_t)\).
+            </p>
+            <div class="formula-box">
+              <p>The lecture’s main mathematical object is the trajectory and its return.</p>
+              <p>\[
+                \tau_{0:T} = (s_0, a_0, r_1, s_1, \dots, r_T, s_T),
+                \qquad
+                J(\pi) = \mathbb{E}_{\tau \sim d^\pi_\tau}\!\left[\sum_{t=1}^{T} r_t\right].
+              \]</p>
+              <p>The policy is good if the expected return under the trajectory distribution it induces is large.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the symbols mean</strong>
+                <p><code>Reward</code> is the scalar feedback at one step. <code>Return</code> is the accumulated future reward along a trajectory. Confusing those two is one of the easiest ways to get lost.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why the expectation matters</strong>
+                <p>Even if the policy is fixed, the return is still random because the policy can sample actions stochastically and the environment can transition stochastically.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Algorithm map</strong>
+                <p>The lecture briefly distinguishes policy-based, value-based, and model-based RL. It then deliberately narrows to policy-gradient methods, while noting that value functions often re-enter later as training stabilizers.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The MDP is a modeling framework, not a guarantee that the problem is easy. Sparse rewards, delayed effects, and partial observability can still make learning very hard even when the notation is compact.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-16-text-rl">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-16-rl/slide-24-text-generation-mdp.png" alt="Slide mapping math problem solving with a language model into reinforcement learning terms such as state, action, policy, environment, and terminal reward">
+            <figcaption>Slides 23-24. For language models, a trajectory is just the model writing a completion one token at a time and being judged after the fact.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 18, 23-24</span>
+              <span class="tag accent">Text generation as RL</span>
+              <span class="tag violet">LLM translation</span>
+            </div>
+            <h3>For language models, the state is usually the prompt plus the prefix, the action is the next token, and the reward is often sparse</h3>
+            <p>
+              The lecture’s most important example for this course is text generation.
+              In the math-problem slide, the state is \(s_t = (x, y_{&lt;t})\): the prompt plus the tokens generated so far.
+              The action is the next token \(a_t = y_t\), the policy is the language model \(p_\theta(y_t \mid y_{&lt;t}, x)\), and the environment simply appends the sampled token to the prefix.
+              The reward can be very sparse, such as \(1\) only if the final answer is correct and \(0\) otherwise.
+              That is why RL for LMs immediately becomes a credit-assignment problem: many intermediate tokens share one delayed verdict.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>State versus observation</strong>
+                <p>The lecture distinguishes environment state, observation, and agent state. In many LM examples the policy conditions on the visible prefix, so observation and agent state nearly coincide, but that is a modeling convenience, not a law of RL.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>A rollout is literally the model thinking out loud one token at a time. RL does not change that autoregressive interface; it changes how the whole trajectory is judged and updated.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Why sparse reward is hard</strong>
+                <p>If only the final answer is scored, the algorithm has to decide which earlier actions deserve credit or blame. That is exactly why naive sequence-level policy gradient has high variance.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked to map LM generation into RL language, give all five pieces cleanly: state, action, policy, environment transition, and reward. The course likes this translation exercise.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-16-reinforce">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-16-rl/slide-30-reinforce.png" alt="Slide presenting the REINFORCE policy-gradient estimator as a sum of returns multiplying gradients of log action probabilities">
+            <figcaption>Slides 28-31 and 48-50. REINFORCE is the lecture’s main derivation: increase log-probability for sampled actions that led to high return.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 28-31, 48-50</span>
+              <span class="tag accent">REINFORCE</span>
+              <span class="tag blue">Most testable Lecture 16 block</span>
+            </div>
+            <h3>REINFORCE uses the log-derivative trick to turn expected-return optimization into a sampled weighted log-prob update</h3>
+            <p>
+              The lecture now asks the obvious question: if the goal is to maximize expected return, why not just differentiate it and run gradient descent?
+              The obstacle is that rewards are defined on sampled trajectories, which include discrete actions and possibly non-differentiable environment behavior.
+              The score-function estimator solves this by moving the gradient onto the log-probability of the sampled outcome.
+              Applied to trajectories, that gives the REINFORCE rule: sample a rollout from the current policy and weight each action’s log-probability gradient by the return that followed.
+            </p>
+            <div class="formula-box">
+              <p>The score-function identity is the bridge from generic probability to policy gradient.</p>
+              <p>\[
+                \nabla_\theta \mathbb{E}_{x \sim p_\theta(x)}[f(x)]
+                =
+                \mathbb{E}_{x \sim p_\theta(x)}\!\left[f(x)\nabla_\theta \log p_\theta(x)\right].
+              \]</p>
+              <p>For RL, the lecture turns this into</p>
+              <p>\[
+                \nabla_\theta J(\theta)
+                \approx
+                \sum_{t=1}^{T} R_t \nabla_\theta \log \pi_\theta(\hat a_t \mid \hat s_t),
+              \]</p>
+              <p>where \(R_t\) is the future return from that point onward. High-return actions get pushed up; low-return actions get pushed down.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why the derivation works</strong>
+                <p>The appendix’s key punchline is that trajectory probability factorizes into initial-state terms, policy terms, and environment-transition terms, but only the policy terms depend on \(\theta\). After taking the gradient, the environment drops out.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Best intuition</strong>
+                <p>The algorithm is not asking “what is the gradient of the reward?” It is asking “which sampled actions made high reward more likely, so their probability should go up next time?”</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Operational recipe</strong>
+                <p>Collect trajectories, compute returns, build the loss \(\mathcal{L}_{PG} = -\sum_t R_t \log \pi_\theta(a_t \mid s_t)\), then backpropagate through the policy network.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>REINFORCE is unbiased in expectation, but it is usually too noisy to use alone at scale. The rest of the lecture is about fixing that variance and step-size problem without changing the core policy-gradient idea.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-16-stabilize">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-16-rl/slide-38-baselines.png" alt="Slide illustrating how a baseline compares observed reward to expected reward for different prompts">
+              <figcaption>Slides 38-39. A baseline says “judge this action relative to what was expected in this state,” not relative to zero.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-16-rl/slide-40-advantages.png" alt="Slide listing advantage estimators including baseline subtraction, temporal-difference residuals, and generalized advantage estimation">
+              <figcaption>Slide 40. Advantages are the lecture’s variance-reduction abstraction: baseline subtraction, TD residuals, and GAE all fit under the same umbrella.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 37-40</span>
+              <span class="tag accent">Variance reduction</span>
+              <span class="tag blue">Quiz-aligned</span>
+            </div>
+            <h3>Vanilla policy gradient is high variance, so the lecture reweights each step with discounted advantages instead of raw episode return</h3>
+            <p>
+              Once the lecture has vanilla REINFORCE on the table, it immediately asks how to make it less noisy.
+              The first answer is <em>discounting</em>: later rewards are weighted by powers of \(\gamma\), which helps control how strongly distant outcomes affect earlier actions.
+              The second answer is <em>baselines</em>: compare observed return to what was expected in that state, rather than to zero.
+              The third answer is <em>advantages</em>: replace raw return with a better estimate of “how much better than expected was this action here?”
+              The lecture then shows three common versions of that idea: a value-function baseline, a one-step TD residual, and generalized advantage estimation (GAE).
+            </p>
+            <div class="formula-box">
+              <p>The core stabilization formulas are:</p>
+              <p>\[
+                R_t^{(\gamma)} = \sum_{t' = t+1}^{T} \gamma^{t' - t - 1} r_{t'},
+                \qquad
+                \hat g_t = (R_t - b(s_t)) \nabla_\theta \log \pi_\theta(a_t \mid s_t).
+              \]</p>
+              <p>\[
+                \hat A_t = R_t - v(s_t),
+                \qquad
+                \delta_t = r_t + \gamma v(s_{t+1}) - v(s_t),
+                \qquad
+                \hat A_t^{\mathrm{GAE}} = \sum_l (\gamma \alpha)^l \delta_{t+l}.
+              \]</p>
+              <p>The unifying idea is that the gradient should care about how surprisingly good an action was, not just about the raw total reward of the whole rollout.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why discounting exists</strong>
+                <p>Delayed rewards create messy credit assignment. Discounting gives the algorithm a principled way to care less about outcomes that are farther away in time, which often reduces variance and changes the effective planning horizon.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Quiz-aligned baseline fact</strong>
+                <p>Subtracting an action-independent baseline does not change the expected gradient because \(\mathbb{E}_{a \sim \pi}[\nabla_\theta \log \pi_\theta(a \mid s)] = 0\). What it changes is variance, not bias.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Why advantages help</strong>
+                <p>A reward of 0.3 might be terrible on an easy prompt and great on a hard one. Advantage estimation normalizes by what was expected from that state, which makes updates more informative.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The value function in this lecture is mostly a helper for estimating expected return and reducing policy-gradient variance. It is not replacing the policy or turning the method into pure value-based RL.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-16-ppo">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-16-rl/slide-41-ppo.png" alt="Slide introducing PPO with an importance ratio between the new and old policy and a clipped objective to prevent overly large policy updates">
+            <figcaption>Slides 41-46. PPO is the lecture’s second stabilization story: keep the same policy-gradient core, but stop any one update from moving the policy too far.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 41-46</span>
+              <span class="tag accent">PPO</span>
+              <span class="tag success">LLM bridge</span>
+            </div>
+            <h3>PPO controls step size by comparing the new policy to the old one and clipping overly aggressive changes</h3>
+            <p>
+              The lecture’s second stabilization idea is about <em>how far</em> the update moves the policy, not about how returns are estimated.
+              Even with better advantages, policy-gradient updates are noisy, and a single large step can derail learning.
+              Proximal Policy Optimization (PPO) handles this by comparing the new policy to the behavior policy that generated the data, forming a probability ratio,
+              and clipping the objective once that ratio moves outside a safe range.
+              The resulting training loop is simple and reusable: collect trajectories, compute advantages, compute a policy-gradient-style loss such as PPO, and update with SGD or Adam.
+              That is why the final slides can immediately pivot to RLHF and RLVR: they mostly change the reward definition, while the policy-gradient plus PPO machinery stays recognizable.
+            </p>
+            <div class="formula-box">
+              <p>The PPO quantities worth recognizing are the old-versus-new ratio and the clipped surrogate objective.</p>
+              <p>\[
+                \mathrm{ratio}(x,y) = \frac{p_\theta(y \mid x)}{p_{\theta_{\mathrm{old}}}(y \mid x)},
+                \qquad
+                L_{\mathrm{PPO}} =
+                \min\!\big(
+                  \mathrm{ratio}(x,y)A(x,y),
+                  \mathrm{clip}(\mathrm{ratio}(x,y), 1-\epsilon, 1+\epsilon)A(x,y)
+                \big).
+              \]</p>
+              <p>If the new policy tries to increase probability too much relative to the old one, the clipped term cuts off the incentive for even larger movement.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What clipping is doing</strong>
+                <p>Clipping is a practical “do not trust one noisy batch too much” rule. It preserves the sign of the improvement signal while damping incentives for overly large policy shifts.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why it matters for LLMs</strong>
+                <p>LM RL often uses long, high-variance trajectories and imperfect rewards. PPO became popular because it keeps the familiar policy-gradient pipeline while making catastrophic jumps less likely.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>How the closing slides fit</strong>
+                <p>The RLHF and RLVR previews are there to show the reusable template: prompt-conditioned policy, scalar reward, an advantage or baseline, and PPO-style optimization. The reward changes; the optimization story mostly does not.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked how PPO differs from vanilla policy gradient, say: same policy-gradient core, but with explicit old-policy comparison and clipping to control update size.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-16-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the Lecture 16 terms most worth being able to define quickly and precisely.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>Reward</strong>
+          <p>The scalar feedback emitted at a particular step or after a trajectory.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Return</strong>
+          <p>The sum of future rewards from a given point onward, possibly discounted by \(\gamma\).</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Policy</strong>
+          <p>The agent’s behavior rule, written as \(\pi(a \mid s)\). For LMs, this is the next-token distribution.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Trajectory / Episode</strong>
+          <p>A sequence of states, actions, and rewards generated by interacting with the environment until termination.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>State versus Observation</strong>
+          <p>The state is the underlying situation relevant for decision-making; the observation is only the part visible to the agent.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Baseline</strong>
+          <p>An estimate of expected return used to reduce variance by judging an action relative to what was expected.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Advantage</strong>
+          <p>A signal measuring how much better or worse an action was than the expected outcome for that state.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>PPO Clipping</strong>
+          <p>A step-size control trick that limits how much the policy update can benefit from making the new policy too different from the old one.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Lecture 16 starts by arguing that maximum-likelihood imitation is not identical to optimizing task success.</li>
+            <li>RL formalizes learning from interaction through MDPs, trajectories, returns, and policies.</li>
+            <li>For text generation, the action is the next token and the reward is often sparse and delayed, which makes credit assignment hard.</li>
+            <li>REINFORCE uses the score-function trick to weight action log-probability gradients by observed return.</li>
+            <li>Discounting, baselines, and advantage estimators are variance-reduction tools for making policy gradients usable.</li>
+            <li>PPO keeps the same basic policy-gradient story but adds update clipping so noisy batches do not move the policy too far at once.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>What is most likely to be tested</strong>
+          <ul>
+            <li>Why task mismatch, data mismatch, and exposure bias motivate RL for some LM tasks.</li>
+            <li>How to map text generation into state, action, policy, environment, reward, and return.</li>
+            <li>What the REINFORCE estimator is doing conceptually and why the environment terms disappear from the gradient.</li>
+            <li>Why subtracting a baseline does not change the expected gradient.</li>
+            <li>How discounted return differs from undiscounted return and what \(\gamma\) is trading off.</li>
+            <li>What PPO clipping is designed to prevent.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-16-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>If next-token likelihood is already optimized, why might a model still fail on correctness or helpfulness?</li>
+            <li>In an LM RL setup, what are the state, action, environment transition, and reward?</li>
+            <li>Why does REINFORCE use \(\nabla_\theta \log \pi_\theta(a_t \mid s_t)\) instead of trying to differentiate the reward directly?</li>
+            <li>Why does subtracting a constant or state-dependent baseline reduce variance without changing the estimator’s expectation?</li>
+            <li>What problem is advantage estimation trying to solve beyond using raw returns?</li>
+            <li>If a question asks “what extra ingredient does PPO add on top of vanilla policy gradient?”, what concise answer would you give?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
     <div class="footer">
-      This site now covers <code>anlp-s2026-11-multimodal.pdf</code> and <code>anlp-s2026-12-multimodal-ii.pdf</code> in one reusable lecture-by-lecture scaffold.
+      This site now covers <code>anlp-s2026-11-multimodal.pdf</code>, <code>anlp-s2026-12-multimodal-ii.pdf</code>, <code>anlp-s2026-15-multimodal-iii.pdf</code>, and <code>anlp-s2026-16-rl.pdf</code> in one reusable lecture-by-lecture scaffold.
       The shared root <code>index.html</code>, shared assets under <code>assets/</code>, and tabbed lecture panels are set up so future lecture companions can plug into the same structure cleanly.
     </div>
   </main>
