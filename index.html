@@ -25,7 +25,7 @@
       <span class="eyebrow">ANLP Spring 2026 · Study Partner</span>
       <h1>ANLP Lecture Companions</h1>
       <p>
-        This companion now covers five lecture decks in the repo’s shared HTML study site.
+        This companion now covers seven lecture decks in the repo’s shared HTML study site.
         It is written for a student who missed class and needs the missing connective tissue the slides assume:
         what the models are optimizing, why the engineering choices make sense, where the hidden tradeoffs are,
         and which concepts are most likely to show up on a quiz or final.
@@ -52,6 +52,14 @@
           <p>The fifth lecture carries that RL toolkit into LLM post-training: one-step versus token-level MDPs, verifiable rewards and RLVR, GRPO-style advantages, math-reasoning RL, and the RLHF pipeline with reward models, reward hacking, and KL control.</p>
         </article>
         <article class="hero-card">
+          <strong>Lecture 18 focus</strong>
+          <p>The sixth lecture turns post-trained LMs into agents: what counts as an agent, how observation and action spaces are chosen, why tools, skills, and memory matter, and why real deployment pushes us from solo autonomy toward human-centered collaboration.</p>
+        </article>
+        <article class="hero-card">
+          <strong>Lecture 19 focus</strong>
+          <p>The seventh lecture turns from agent behavior to efficient deployment: number formats, INT8 quantization schemes, outlier handling with <code>LLM.int8()</code>, local inference stacks like GGUF and llama.cpp, and training-time ideas such as QAT and QLoRA.</p>
+        </article>
+        <article class="hero-card">
           <strong>Quiz-calibrated style</strong>
           <p>The quiz answer keys suggest the course rewards mechanism-level reasoning more than paper-name recall, so the notes below prioritize objectives, estimators, scaling arguments, and what changes when a design choice changes.</p>
         </article>
@@ -64,6 +72,8 @@
       <a class="lecture-tab inactive" data-lecture-tab="lecture-15-multimodal-iii" href="#lecture-15-multimodal-iii">Lecture 15 · Multimodal III</a>
       <a class="lecture-tab inactive" data-lecture-tab="lecture-16-rl" href="#lecture-16-rl">Lecture 16 · RL</a>
       <a class="lecture-tab inactive" data-lecture-tab="lecture-17-rl-llms" href="#lecture-17-rl-llms">Lecture 17 · RL for LLMs</a>
+      <a class="lecture-tab inactive" data-lecture-tab="lecture-18-agents" href="#lecture-18-agents">Lecture 18 · Agents</a>
+      <a class="lecture-tab inactive" data-lecture-tab="lecture-19-quantization" href="#lecture-19-quantization">Lecture 19 · Quantization</a>
     </nav>
 
     <section class="lecture-panel" id="lecture-11-multimodal" data-lecture-panel="lecture-11-multimodal">
@@ -2172,8 +2182,1034 @@
       </div>
     </section>
 
+    <section class="lecture-panel" id="lecture-18-agents" data-lecture-panel="lecture-18-agents">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 18</span>
+        <h2>Language Model-based Agents</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-18-zora.pdf</code> into the agent-design ideas most likely to matter on an exam:
+          what makes an LM system an <em>agent</em> rather than just a generator, how observation and action spaces are chosen,
+          why tools, skills, and memory change agent behavior so much, what realistic benchmarks and training pipelines need to include,
+          and why the lecture ends by shifting from solo autonomy to human-centered, collaborative agents.
+        </p>
+      </div>
+
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        Lecture 18 is the natural sequel to Lecture 17.
+        Lecture 17 asked how to optimize an LM’s outputs with rewards; Lecture 18 asks what changes when that LM is placed in an environment,
+        receives observations over time, and can take actions that alter the world outside the prompt.
+        The first third defines the agent loop and the observation/action interface.
+        The middle third explains how tools, induced skills, and memory make multi-step behavior more efficient and reusable.
+        The final third becomes a systems lecture: how to benchmark and train real-world agents, why current coding benchmarks are already showing cracks,
+        and why collaboration and efficient oversight are becoming central design goals.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Distinguish an LM-based agent from RAG or pure reasoning by the perception-and-action loop.</li>
+            <li>Compare text-based observations such as files or accessibility trees with screenshot-based observations and visual grounding.</li>
+            <li>Explain why tools and APIs can outperform raw primitive actions, and why hybrid interfaces often work best.</li>
+            <li>Explain what self-induced skills are and why they help both efficiency and verification.</li>
+            <li>Distinguish internal state or memory from the fixed LM weights, and compare factual, episodic, semantic, and procedural memory.</li>
+            <li>Describe what a realistic agent benchmark must specify: task, environment, and evaluation.</li>
+            <li>Explain why the lecture ends by criticizing benchmark saturation and motivating human-centered collaborative agents.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 4-9 are merged into one definition block because the digital, embodied, physical, and social examples all serve the same boundary-setting question: what counts as an agent?</li>
+            <li>Slides 11-15 become one observation block; the individual HTML, screenshot, set-of-marks, and grounding slides are treated as one interface-design comparison.</li>
+            <li>Slides 17-29 become two blocks: action abstraction and skill/tool learning. The benchmark screenshots and result charts are kept only when they sharpen the conceptual point.</li>
+            <li>Slides 31-37 are compressed into one memory block, with Mem0 and Letta treated as evidence that memory is becoming system infrastructure rather than as standalone exam topics.</li>
+            <li>Slides 39-46 are merged into one “building real-world agents” block rather than separate paper summaries for benchmarks, frameworks, and training recipes.</li>
+            <li>Slides 48-55 are split into a critique block and a collaboration block because that transition is the lecture’s clearest end-of-class punchline.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_4_answer_key.pdf</code> directly asks which systems are <em>not</em> agents, so the notes below keep the RAG-versus-agent distinction explicit rather than assuming it is obvious.</li>
+            <li>The broader quiz set consistently rewards mechanism-level reasoning over paper-name recall, so the blocks below focus on what changes when you alter the interface, abstraction level, reward source, or evaluation setup.</li>
+            <li>That calibration is why the notes emphasize abstractions, bottlenecks, and failure modes more than product screenshots or isolated benchmark numbers.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-18-definition">Definition</a>
+        <a href="#lecture-18-observation">Observation</a>
+        <a href="#lecture-18-actions">Actions</a>
+        <a href="#lecture-18-skills">Skills</a>
+        <a href="#lecture-18-memory">Memory</a>
+        <a href="#lecture-18-building">Building</a>
+        <a href="#lecture-18-critique">Critique</a>
+        <a href="#lecture-18-collaboration">Collaboration</a>
+        <a href="#lecture-18-glossary">Glossary</a>
+        <a href="#lecture-18-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card no-media full-width jump-target" id="lecture-18-definition">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 2-9</span>
+              <span class="tag accent">Lecture 17 continuation</span>
+              <span class="tag blue">Directly quiz-relevant</span>
+            </div>
+            <h3>Lecture 18 adds an environment loop to the LM: an agent is not just a model that computes, but a system that perceives, acts, and updates its internal state over time</h3>
+            <p>
+              The opening slides are doing a careful reframing.
+              Lecture 17 treated the LM as a policy over sequences; Lecture 18 keeps that policy view, but now places the model inside a loop with an
+              <em>environment</em>, an <em>observation space</em>, an <em>action space</em>, and an <em>internal state</em>.
+              Slides 4-7 then give examples across digital work, embodied tasks, robotics, and social simulation to show that the same abstraction can apply far beyond chat.
+              The crucial testable move comes on slides 8-9: computation alone is not enough.
+              RAG retrieves and generates but does not itself act on the world.
+              A pure reasoning model may deliberate, but if there is no environment state and no action that changes it, the lecture does not want to call it an agent.
+              Program-of-thought is only agentic if it is embedded in a perception-and-action loop.
+            </p>
+            <div class="formula-box">
+              <p>The lecture’s loop is easiest to remember in RL language:</p>
+              <p>\[
+                o_t = \mathrm{Obs}(e_t),
+                \qquad
+                a_t \sim \pi_\theta(\cdot \mid x, o_{\le t}, a_{&lt;t}, m_t),
+                \qquad
+                e_{t+1} = T(e_t, a_t).
+              \]</p>
+              <p>The new object relative to plain prompting is the environment state \(e_t\), plus the possibility that actions change it across multiple steps.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>An agent is not defined by being large, multimodal, or autonomous. It is defined by being in a loop: observe the environment, choose an action, and alter what happens next.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>Once a model is agentic, architecture questions change. You now care about interface design, long-horizon compounding errors, reusable skills, and oversight, not just next-token quality.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Missing context</strong>
+                <p>RAG can still be one component <em>inside</em> an agent. The lecture’s claim is only that retrieval by itself is not yet the full agent loop.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked whether a system is an agent, answer by checking for an external environment, explicit observations, and actions that can change external state.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-observation">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-12-web-html-accessibility-tree.png" alt="Slide comparing screenshot, HTML DOM, and accessibility tree representations for a web page as agent observations">
+              <figcaption>Slides 11-12. The same webpage can be exposed to the agent as files, raw HTML, or a structured accessibility tree. Each representation preserves different information.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-15-visual-grounding.png" alt="Slide illustrating visual grounding for GUI agents on screenshot-based observations">
+              <figcaption>Slides 14-15. Screenshot-based observations recover layout and appearance, but then the agent needs visual grounding to localize the right object and act on it.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 10-15</span>
+              <span class="tag accent">Observation space</span>
+              <span class="tag violet">Interface design</span>
+            </div>
+            <h3>Observation design is one of the lecture’s biggest hidden levers, because it determines what structure the LM can actually see</h3>
+            <p>
+              The observation slides are more than an inventory of modalities.
+              For coding agents, text files are already a natural representation.
+              For web agents, the environment can expose a screenshot, the raw HTML DOM tree, or a trimmed accessibility tree.
+              The accessibility tree is important because it converts visual UI elements into a compact text-like structure with roles such as button, link, and textbox, which is often easier for an LM to reason over than raw pixels or messy HTML.
+              But the lecture also shows what text-only views lose.
+              Slide 13 warns that LM-based element filtering can miss all relevant items 47% of the time, and slides 14-15 introduce screenshot-plus-marks and visual grounding so the agent can use layout, icons, and spatial cues that are not fully represented in text.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is important</strong>
+                <p>The observation space is not neutral plumbing. It shapes what the LM can notice, how long the context becomes, and what kinds of mistakes are even possible.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>Text views are compressed and semantically typed. Screenshot views preserve layout and appearance. Real agents often need both, because neither is sufficient for every UI.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Main tradeoff</strong>
+                <p>Structured text observations are cheaper and easier to parse, but they can discard visually meaningful information. Screenshot observations are richer, but they force the model to solve visual grounding as well.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Do not treat “HTML” and “screenshot” as interchangeable views of the same task. The lecture’s point is that they create different bottlenecks and different failure modes.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-actions">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-18-tools-vs-primitive-actions.png" alt="Slide comparing many primitive GUI actions with a single high-level tool call for checking weather">
+              <figcaption>Slides 17-18. High-level tools reduce horizon length: one semantic action can replace a long brittle sequence of clicks, typing, and navigation.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-20-human-engineered-apis.png" alt="Bar chart showing browsing, API-based, and hybrid web-agent performance across sites">
+              <figcaption>Slides 19-20. API-only is not always best, browsing-only is not always best, and hybrid agents often win because they exploit whichever interface is more informative on a given site.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 16-20</span>
+              <span class="tag accent">Action space</span>
+              <span class="tag blue">Likely comparison point</span>
+            </div>
+            <h3>The lecture’s action-space lesson is that abstraction level matters: primitive actions make agents flexible, but tools and APIs make them far more efficient</h3>
+            <p>
+              Slides 17-20 make the same point from several angles.
+              A computer-use agent can operate with primitive actions such as click, scroll, keypress, read, edit, run, and send a message.
+              That is maximally general, but it makes the planning horizon long and brittle.
+              Slide 18 dramatizes the difference with weather lookup: a long sequence of UI actions can often be replaced by one high-level tool call such as <code>check_weather("Pittsburgh")</code>.
+              Slide 19 extends that idea to human-engineered web APIs, and slide 20 adds the important nuance that there is no universal winner.
+              Some websites are easiest to solve via structured APIs, some require browsing, and hybrid agents benefit from having both channels available.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Choosing an action vocabulary is like choosing the granularity of the MDP. Finer-grained actions are more general, but coarser-grained tools make planning and execution much easier.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why tools help</strong>
+                <p>A tool packages a reliable multi-step procedure behind a single semantic action. That shortens trajectories, reduces compounding errors, and makes intent clearer.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Hidden tradeoff</strong>
+                <p>APIs can be powerful but narrow. Primitive browsing can reach arbitrary interfaces but is slower and more error-prone. Hybrid agents keep the flexibility while exploiting structure when it exists.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If a question asks why tools improve performance, the safest answer is: they raise the action abstraction level, so the model spends less probability mass on brittle low-level control.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-skills">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-22-self-induced-skills.png" alt="Slide showing repeated web actions being abstracted into reusable functions such as search_reviews and open_marketing_reviews">
+              <figcaption>Slides 21-22. Self-induced skills convert repeated trajectories into named reusable procedures, which is more than just calling a tool once.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-24-skill-adaptation.png" alt="Slide showing skill adaptation reducing redundant steps in a web navigation address-update task">
+              <figcaption>Slides 23-26. The efficiency gain is not cosmetic: better skills remove redundant steps, avoid dead ends, and make oversight easier because the plan is more structured.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 21-29</span>
+              <span class="tag accent">Skills and tool learning</span>
+              <span class="tag violet">Abstraction and reuse</span>
+            </div>
+            <h3>Lecture 18 distinguishes three layers that are easy to collapse together: primitive actions, externally provided tools, and agent-induced skills</h3>
+            <p>
+              The self-induced-skill slides show the agent discovering reusable procedures from its own successful trajectories.
+              Instead of repeatedly emitting the same low-level action sequence, it can learn or induce a named routine such as <code>search_reviews(...)</code> or
+              <code>open_marketing_reviews()</code>.
+              The important conceptual leap is that a skill is not just a single external API call.
+              It can also be a reusable workflow <em>written in the agent’s own action language</em>.
+              That is why slide 24’s address-update example matters: better skills do not just make the trace shorter; they make the workflow more faithful to the task structure and easier to verify.
+              Slides 27-29 then zoom out and categorize the kinds of tools agents may use, from knowledge access to computation to world interaction, and compare two learning approaches:
+              prompt/few-shot tool use, as in Toolformer-style demonstrations, versus specialized tool tokens or embeddings that bake tool invocation more directly into the model interface.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why induced skills matter</strong>
+                <p>They turn repeated successful sub-trajectories into reusable modules. That reduces search, lowers the number of fragile action decisions, and improves sample efficiency.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Verification angle</strong>
+                <p>Slide 26 is easy to miss, but it is important: compact programmatic skills are easier for humans to inspect and validate than long opaque trajectories, which matters because agents act autonomously while humans remain accountable.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Prompting vs. tool tokens</strong>
+                <p>Few-shot prompting is flexible and cheap to add, while specialized tool tokens make invocation more explicit and potentially more scalable. The tradeoff is between interface simplicity and deeper model integration.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>A skill is not just “any tool.” In this lecture, a tool is an external capability, while a skill can be an induced reusable procedure that composes tools or primitive actions.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-memory">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-18-zora/slide-34-memory-learning.png" alt="Slide categorizing agent memory into core, episodic, semantic, procedural, resource, and knowledge-vault memory, along with memory structure and modality">
+            <figcaption>Slides 31-37. The memory block’s main message is that “internal state” is not one thing: agents can store user facts, past events, reusable procedures, external resources, and multimodal long-term context.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 30-38</span>
+              <span class="tag accent">Internal state</span>
+              <span class="tag success">Memory</span>
+            </div>
+            <h3>The internal-state section says that once an LM becomes an agent, the prompt is no longer enough shorthand for everything the system knows</h3>
+            <p>
+              Slide 30 introduces internal state as the third major piece of the agent loop, and the next slides unpack what that really means.
+              Some memory is <em>factual or preferential</em>: user identity, preferences, and stable facts that should carry across sessions.
+              Some is <em>procedural</em>: reflection summaries from failures or reusable workflows that can improve later task solving.
+              Slide 34 then gives the cleanest taxonomy in the deck by separating memory into categories such as core, episodic, semantic, procedural, resource, and knowledge-vault memory, while also reminding you that memory has structure and modality choices too.
+              This is why the Mem0 and Letta slides are in the lecture.
+              They are evidence that memory is becoming a product layer for agents, not just an academic side feature.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is important</strong>
+                <p>Without memory, each episode starts almost from scratch. With memory, agents can personalize, reuse past experience, and reduce repeated setup work.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>Think of internal state as the agent’s working plus long-term context: user facts, previous events, learned procedures, and references to useful resources.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Hidden risk</strong>
+                <p>Useful memory is not the same as always remembering more. Stale, wrong, or privacy-sensitive memory can hurt behavior just as much as missing memory can.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The lecture’s memory is not primarily weight updates to the backbone LM. It is mostly explicit state that gets retrieved, updated, or inserted into the model’s context.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-building">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-40-benchmark-example.png" alt="Slide defining an agent benchmark in terms of task, environment, and evaluation">
+              <figcaption>Slides 39-41. A serious agent benchmark needs more than a prompt and an answer key; it needs a task, an environment to act in, and an evaluation rule.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-44-synatra.png" alt="Slide showing how indirect textual how-to knowledge can be converted into direct demonstrations for training digital agents">
+              <figcaption>Slides 44-46. Agent training is a trajectory-data problem: indirect instructions, exploration traces, and human demonstrations all try to create better action sequences for supervision.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 39-46</span>
+              <span class="tag accent">Building real-world agents</span>
+              <span class="tag blue">Systems design</span>
+            </div>
+            <h3>After the core agent loop, the lecture pivots to the harder engineering question: how do we evaluate and train agents that actually operate in realistic environments?</h3>
+            <p>
+              Slides 39-46 are easy to read as a sequence of paper references, but together they make one broader systems point.
+              First, slide 40 says a benchmark must specify three things: the natural-language task, the environment and resources the agent can access, and the evaluation procedure.
+              Slide 41 sharpens that by showing how different benchmarks cover different domains and skills, which means a benchmark can be narrow, broad, or badly mismatched to the real work we care about.
+              Slides 42-43 then move from evaluation to infrastructure: some frameworks are general agents, some are coding-oriented, and many expose <em>special function calling</em> or agent-specific high-level actions on top of the base LM.
+              Finally, slides 44-46 address the training-data bottleneck.
+              Agent models need demonstration trajectories, and those can be synthesized from indirect how-to knowledge, generated through exploration, or collected directly from humans using real interfaces.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Benchmark ingredients</strong>
+                <p>The lecture’s benchmark template is compact but important: task, environment, evaluation. If any of the three is unrealistic, the benchmark can give a distorted picture of agent quality.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Framework vs. backbone</strong>
+                <p>The framework is not just the LM. It includes memory, skills, tools, function calling, and execution logic that let the backbone operate as an agent.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Training-data lesson</strong>
+                <p>Static text corpora are not enough. Agent training needs trajectories or trajectory-like supervision, because the target behavior is an action sequence in context, not just a standalone response.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why agent foundation models are hard to train, say: the difficult part is acquiring grounded action demonstrations and realistic environments, not just scaling the base LM.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-critique">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-49-swebench-saturation.png" alt="Slide showing recent rapid improvement and saturation trends on SWE-bench Verified">
+              <figcaption>Slides 48-50. The lecture uses SWE-bench saturation and patch-quality concerns to argue that benchmark progress alone is no longer enough evidence of useful coding agents.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-52-human-centered-coding-agents.png" alt="Diagram organizing human-centered coding agents around task alignment, steerability, verification, and adaptability">
+              <figcaption>Slides 52-53. The proposed replacement lens is human-centered: align the task, let humans steer, make verification efficient, and adapt over time.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 47-53</span>
+              <span class="tag accent">Human-centered critique</span>
+              <span class="tag violet">Likely final-exam framing</span>
+            </div>
+            <h3>The lecture’s strongest thesis is not “agents are amazing,” but “current agent evaluation is already missing what humans actually need”</h3>
+            <p>
+              The last major transition in the deck is a critique of current coding-agent practice.
+              Slides 48-50 argue that SWE-bench Verified is saturating and that solved benchmark instances can still hide undesirable behavior such as bloated patches.
+              Slide 51 goes one step further: even when an agent “helps,” the human workflow can become worse if the system creates review, debugging, communication, or transparency overhead.
+              Slides 52-53 then propose the replacement frame.
+              Instead of asking only whether an autonomous agent can finish a benchmark task, the lecture asks whether the system captures user intent, supports steering, makes verification easy, and adapts across repeated interaction.
+              That is why slide 53 emphasizes efficient oversight and <em>shapeshifting verification</em>: the right evidence for correctness depends on the task, whether that means a browser render, a loss curve, a CLI recording, or a simulated timeline.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why benchmark saturation matters</strong>
+                <p>If the benchmark is narrow, contaminated, or ceilinged out, higher scores stop meaning what we want them to mean. The lecture treats this as a measurement problem, not just a bragging-rights problem.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this follows Lecture 17</strong>
+                <p>Lecture 17 already warned that optimizing a proxy reward can diverge from the real objective. Lecture 18 makes the same point at the systems level: optimizing a benchmark can diverge from helping a human user.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Human-centered replacement</strong>
+                <p>The four pillars on slide 52 are a useful memory aid: task alignment, steerability, verification, and adaptability. They tell you what the lecture thinks current agents under-optimize.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why “more autonomy” is not the whole goal, say: real users need systems that can be steered, checked efficiently, and adapted over time, not just systems that maximize isolated benchmark completion.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-18-collaboration">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-54-cowpilot.png" alt="Slide illustrating CowPilot, where the agent drives web navigation sessions and humans can pause, verify, and intervene">
+              <figcaption>Slide 54. CowPilot’s point is that collaboration can improve success over both human-only and agent-only baselines when the handoff is designed well.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-18-zora/slide-55-collaborative-gym.png" alt="Slide showing asynchronous collaboration patterns where humans review, refine, and intervene in agent-produced work">
+              <figcaption>Slide 55. Collaborative Gym makes the evaluation target explicit: can the agent ask for help, accept revisions, and support iterative refinement rather than only acting alone?</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 54-55</span>
+              <span class="tag accent">Collaborative agents</span>
+              <span class="tag success">Future direction</span>
+            </div>
+            <h3>The lecture ends by replacing “fully autonomous” with a richer goal: optimize the joint human-agent workflow</h3>
+            <p>
+              The collaboration slides are important because they are not mere product demos.
+              CowPilot shows a concrete protocol in which the agent can drive a task session, pause, resume, and accept human intervention at useful checkpoints.
+              Collaborative Gym pushes the same idea further: the agent may draft, the human may critique or add constraints, the agent may ask for help on a blocker, and the human may make the final high-stakes decision.
+              In other words, the objective is no longer just final-task success under full autonomy.
+              It becomes joint performance under interruptibility, reviewability, and efficient handoff.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Collaboration is not a fallback for weak agents. It is a first-class design choice that can outperform both human-only and agent-only workflows.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>Real deployments often contain uncertainty, partial information, and accountability requirements. A collaborative agent can surface uncertainty and request intervention instead of pretending autonomy is always best.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>New evaluation target</strong>
+                <p>Once collaboration enters the picture, you need to measure more than final correctness: interruption quality, handoff quality, review burden, and whether the system asks for help at the right time.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>“Human in the loop” is too vague. The lecture wants concrete protocols for pause, resume, verify, refine, and override, not just occasional human monitoring.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-18-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the Lecture 18 terms most worth being able to define quickly and precisely.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>LM-based Agent</strong>
+          <p>A system that uses an LM inside a loop with an external environment, observations, actions, and internal state.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Observation Space</strong>
+          <p>The representation through which the environment is exposed to the agent, such as files, HTML, an accessibility tree, or screenshots.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Accessibility Tree (AX Tree)</strong>
+          <p>A structured textual view of a UI that exposes elements with semantic roles like button, link, and textbox.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Visual Grounding</strong>
+          <p>The ability to map a textual intent onto the correct object or region in a screenshot-based observation.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Primitive Action</strong>
+          <p>A low-level action such as click, scroll, keypress, read, or edit that directly manipulates the environment.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Tool / Specialized Action</strong>
+          <p>A higher-level capability or API call that packages a meaningful subtask behind one semantic action.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Skill</strong>
+          <p>A reusable workflow, often induced from successful trajectories, that composes primitive actions or tools into a named procedure.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Agent Memory / Internal State</strong>
+          <p>Explicit state used across steps or sessions, such as user facts, past events, procedures, or references to resources.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Agent Benchmark</strong>
+          <p>An evaluation setup that specifies a task, an environment the agent can act in, and a rule or model for scoring success.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Human-Centered Collaborative Agent</strong>
+          <p>An agent designed for steering, verification, intervention, and joint success with a human rather than autonomy alone.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Lecture 18 takes the LM policy from Lecture 17 and embeds it in an environment loop with observations, actions, and internal state.</li>
+            <li>Observation design is a modeling choice: files and accessibility trees expose structured semantics, while screenshots and visual grounding recover layout and visual cues.</li>
+            <li>Action abstraction matters. Primitive actions are flexible, but tools, APIs, and induced skills shorten trajectories and reduce brittle planning errors.</li>
+            <li>Memory lets agents carry user facts, past events, reusable procedures, and external resources across steps or sessions without changing the backbone weights.</li>
+            <li>Real-world agents require benchmark design and trajectory data, not just larger base models.</li>
+            <li>The lecture ends by arguing that future progress should be judged by human-centered collaboration and oversight, not autonomy scores alone.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>Exam-oriented comparisons</strong>
+          <ul>
+            <li><strong>RAG vs. agent</strong>: RAG retrieves and generates; an agent also acts on an external environment.</li>
+            <li><strong>Text observations vs. screenshots</strong>: text is compact and semantically typed; screenshots preserve layout but require grounding.</li>
+            <li><strong>Primitive actions vs. tools</strong>: primitive actions are universal but long-horizon; tools are shorter and more reliable but less general.</li>
+            <li><strong>Tool vs. skill</strong>: a tool is an external capability; a skill can be an induced reusable workflow that composes tools or actions.</li>
+            <li><strong>Memory vs. weights</strong>: the lecture’s memory is mostly explicit retrievable state, not finetuning the LM every time something new happens.</li>
+            <li><strong>Benchmark success vs. human usefulness</strong>: high autonomous benchmark performance can still miss steering, verification, and workflow overhead.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-18-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>Why does the lecture say a pure RAG system is usually not an agent?</li>
+            <li>When would an accessibility tree be a better observation than a screenshot, and when would the screenshot be better?</li>
+            <li>Why can one tool call outperform a long primitive-action trace even if both are in principle capable of solving the task?</li>
+            <li>What is the difference between a tool, a self-induced skill, and a memory entry?</li>
+            <li>Why do realistic agent benchmarks need task, environment, and evaluation rather than just prompts and answers?</li>
+            <li>What problem is the lecture trying to solve by moving from solo autonomous agents to collaborative human-agent workflows?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="lecture-panel" id="lecture-19-quantization" data-lecture-panel="lecture-19-quantization">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 19</span>
+        <h2>Quantization</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-19-quantization.pdf</code> into the efficiency ideas most likely to matter on an exam:
+          why model memory becomes the bottleneck once we try to deploy large models on everyday hardware,
+          how low-bit quantization maps floats into integers, when absmax versus zero-point quantization makes sense,
+          why outliers break naive INT8 and motivate <code>LLM.int8()</code>, and how training-time methods such as QAT and QLoRA
+          differ from inference-only quantization.
+        </p>
+      </div>
+
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        Lecture 19 is the systems sequel to Lecture 18.
+        Lecture 18 asked how to make LMs act usefully in the world; Lecture 19 asks how to make those systems fit and run on real hardware.
+        The deck first reviews how computers represent numbers, because quantization is fundamentally a change of representation.
+        It then introduces inference-time INT8 quantization, explains why outliers create most of the pain in large transformers,
+        and ends by separating two training-time uses of quantization: QAT for accuracy recovery and QLoRA for memory-efficient fine-tuning.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Compute the memory footprint of a model from parameter count and precision, and explain why quantization mainly attacks memory and bandwidth bottlenecks.</li>
+            <li>Explain the difference between floating point and integer representations at a high level, especially why BF16 keeps range better than FP16.</li>
+            <li>Write the idea of absmax quantization in words and explain why low-bit matmuls still accumulate into INT32.</li>
+            <li>Compare absmax and zero-point quantization, especially symmetric versus asymmetric data.</li>
+            <li>Explain why outliers cause large quantization error and how <code>LLM.int8()</code> avoids throwing everything back to full precision.</li>
+            <li>Explain what fake quantization does in QAT and why QLoRA solves a different problem from QAT.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 6-13 are merged into one number-format block because the unsigned-integer, signed-integer, floating-point, and BF16 examples are all setup for one later question: what information the representation can preserve.</li>
+            <li>Slides 17-22 are compressed into one quantization-schemes block rather than treated as four separate notes, because the important exam distinction is the comparison between absmax and zero-point plus the role of vector-wise scaling.</li>
+            <li>Slides 30-34 are folded into one deployment block; the GGML/GGUF screenshots and local-model examples are evidence that real systems use mixed recipes, not standalone concepts to memorize line by line.</li>
+            <li>Slide 42’s “many other methods” pointer is not given its own block, because the lecture’s examinable core is the logic of the main methods, not a taxonomy of every library feature.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_5_answer_key.pdf</code> directly tests the key idea behind <code>LLM.int8()</code>: keep a tiny set of outlier features in higher precision while quantizing the rest.</li>
+            <li>The same quiz directly tests QAT’s fake-quantization story, so the training block below emphasizes exposure to quantization noise rather than vague “robustness” language.</li>
+            <li>Quiz 5’s parallelism questions reinforce that this course likes bottleneck reasoning, so the notes are organized around which resource each method saves: memory, bandwidth, communication, or accuracy.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-19-setup">Setup</a>
+        <a href="#lecture-19-number-formats">Number Formats</a>
+        <a href="#lecture-19-int8">INT8 Schemes</a>
+        <a href="#lecture-19-outliers">Outliers</a>
+        <a href="#lecture-19-llm-int8">LLM.int8()</a>
+        <a href="#lecture-19-deployment">Deployment</a>
+        <a href="#lecture-19-training">Training</a>
+        <a href="#lecture-19-glossary">Glossary</a>
+        <a href="#lecture-19-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card no-media full-width jump-target" id="lecture-19-setup">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 2-5</span>
+              <span class="tag accent">Lecture 18 continuation</span>
+              <span class="tag blue">Deployment bottleneck</span>
+            </div>
+            <h3>Lecture 19 begins where Lecture 18 leaves off: once models and agents are useful, the next constraint is whether they physically fit on the hardware you want to use</h3>
+            <p>
+              The motivation slides are not generic “models are big” remarks.
+              They are making a concrete systems claim: memory is often the first wall you hit before algorithmic elegance matters.
+              The Qwen3-8B example is the lecture’s anchor.
+              At 16 bits per parameter, an 8B-parameter model needs about 16 GB just to store weights, and the slide adds a rough inference-time multiplier of about \(1.5\times\) to account for activations and other runtime state.
+              That pushes the total to roughly 24 GB, which already breaks a 16 GB MacBook Air or T4 GPU.
+              Quantization is introduced as the simplest way to attack that bottleneck: store each weight using fewer bits so the memory footprint and memory traffic drop before the model ever runs.
+            </p>
+            <div class="formula-box">
+              <p>The lecture’s motivating arithmetic is worth being able to reproduce quickly:</p>
+              <p>\[
+                8\text{B params} \times 16 \text{ bits} = 128 \text{B bits} = 16 \text{ GB of weights.}
+              \]</p>
+              <p>If inference needs about \(1.5\times\) that footprint, the runtime budget is roughly 24 GB. At 4-bit weights, the same back-of-the-envelope calculation drops to about 4 GB of weights and around 6 GB total.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Quantization is motivated first as a deployment method: make inference and fine-tuning possible on devices that otherwise run out of memory or swap to disk.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>Large-model inference is often limited by moving weights through memory, not only by raw floating-point throughput. Fewer bits means less storage and less data movement.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Why this follows Lecture 18</strong>
+                <p>Lecture 18 cared about realistic deployment and human-facing systems. Lecture 19 asks the hardware question that immediately follows: can the model actually run on the machine that needs it?</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Quantization does not magically make every model faster on every device. The most reliable win is memory footprint; latency improvements depend on kernels, hardware support, and how much dequantization overhead remains.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-19-number-formats">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 6-13</span>
+              <span class="tag accent">Numeric background</span>
+              <span class="tag violet">Hidden prerequisite</span>
+            </div>
+            <h3>The warm-up on integers and floating point matters because quantization is a representation change: you only understand the approximation if you know what the original format was buying you</h3>
+            <p>
+              Slides 6-13 review bits, unsigned integers, signed integers, and floating point because quantization is not just “store fewer digits.”
+              Unsigned integers allocate all their patterns to nonnegative values.
+              Signed integers use a sign convention such as two’s complement to cover both positive and negative ranges.
+              Floating point is different: each number carries its own sign, exponent, and significand, so it can represent values across a wide dynamic range without using the same linear spacing everywhere.
+              That is the bridge to BF16.
+              The lecture explicitly asks for the pros and cons of BF16, and the key point is that BF16 keeps the wide exponent range of FP32 but uses fewer significand bits, so it preserves range better than FP16 while sacrificing precision.
+            </p>
+            <div class="formula-box">
+              <p>The slide’s floating-point equation is the right abstraction to remember:</p>
+              <p>\[
+                \text{value} = (-1)^{\text{sign}} \cdot (1.\text{significand}) \cdot 2^{\text{exponent}-\text{bias}}.
+              \]</p>
+              <p>The exponent controls scale or dynamic range; the significand controls local precision. Quantization to INT8 removes that per-number floating exponent and replaces it with a shared scale chosen for a tensor, vector, or block.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is important</strong>
+                <p>Float formats let different numbers effectively live at different scales. Integer quantization forces many values to share one scale, which is exactly why outliers become so dangerous later in the lecture.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>Floating point spends bits on flexibility. Integer quantization spends fewer bits, but only after choosing a fixed grid that all values must land on.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>BF16 versus FP16</strong>
+                <p>BF16 is attractive for deep learning because it keeps the FP32-style exponent range, so overflows and underflows are less painful than in FP16. The tradeoff is coarser precision because the significand is shorter.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why INT8 is a more aggressive approximation than BF16, the clean answer is: BF16 is still floating point, so every number keeps its own exponent; INT8 relies on a shared scaling rule and therefore loses more information.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-19-int8">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-19-quantization/slide-17-absmax-formula.png" alt="Slide showing absmax INT8 quantization, where values are scaled by the maximum absolute value before rounding into the range minus 127 to 127">
+              <figcaption>Slides 17-19. Absmax is the simplest symmetric scheme: pick one scale, map into \([-127,127]\), run the matmul in INT8, then rescale the INT32 accumulation.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-19-quantization/slide-21-zeropoint-formula.png" alt="Slide showing zero-point INT8 quantization with a learned scale and offset that map the floating-point minimum and maximum into the INT8 range">
+              <figcaption>Slides 21-22. Zero-point adds an offset so asymmetric data can use the whole INT8 range instead of wasting half the codes.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 15-22</span>
+              <span class="tag accent">Core quantization math</span>
+              <span class="tag blue">Most testable Lecture 19 block</span>
+            </div>
+            <h3>The lecture’s main quantization comparison is between absmax and zero-point: both turn float values into low-bit integers, but they make different assumptions about the data distribution</h3>
+            <p>
+              The quantization section starts with the general definition: map values from a large set into a smaller set, which necessarily introduces quantization error.
+              For LLMs, the main targets are the attention and feed-forward projection layers, because they dominate both parameter count and a large fraction of computation.
+              Absmax quantization is the lecture’s clean symmetric baseline.
+              It scales values by the maximum absolute magnitude so the largest positive or negative value lands near \(\pm127\), rounds to INT8, performs low-bit matrix multiplication, and accumulates results into INT32 before rescaling.
+              Zero-point quantization instead chooses a scale and an offset so an arbitrary interval \([x_{\min}, x_{\max}]\) maps into the INT8 range.
+              That makes it better when the data are asymmetric, because the method does not assume zero sits at the middle of the useful range.
+            </p>
+            <div class="formula-box">
+              <p>The two formulas worth keeping straight are:</p>
+              <p>\[
+                Q_{\mathrm{absmax}}(X) = \operatorname{round}\!\left(\frac{127X}{\max_{ij}|X_{ij}|}\right),
+                \qquad
+                X \approx \frac{\max |X|}{127} Q_{\mathrm{absmax}}(X).
+              \]</p>
+              <p>\[
+                Q_{\mathrm{zp}}(x)=\operatorname{round}(s x)+z,
+                \qquad
+                s = \frac{255}{x_{\max}-x_{\min}}.
+              \]</p>
+              <p>The lecture also adds an important practical refinement: vector-wise quantization. Instead of one global scale for all of \(X\) or \(W\), quantize each row of \(X\) and each column of \(W\) separately so local ranges are better matched.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What remains low precision versus high precision</strong>
+                <p>The stored quantized weights or activations are low precision, but scale factors still need to be stored, and matmul results are accumulated in INT32 to avoid catastrophic overflow during summation.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Absmax versus zero-point</strong>
+                <p>Absmax is symmetric and simple, so it works naturally when the data are centered around zero. Zero-point is asymmetric and better when the values occupy a shifted range, such as mostly positive activations.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Useful bridge</strong>
+                <p>In modern terminology, most of this first inference block is post-training quantization: start with an already trained model, quantize it, and run inference without retraining the network to adapt.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Do not say “INT8 means every value is stored exactly with 8 bits instead of 16 bits.” The lost piece is the floating-point adaptivity. Many different float values now collapse onto the same discrete code once the shared scale is chosen.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-19-outliers">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-19-quantization/slide-24-outlier-information-loss.png" alt="Slide comparing quantization error with and without an outlier, showing that one large value causes small values to collapse onto a very coarse grid">
+            <figcaption>Slides 23-24. One large outlier stretches the quantization grid so much that the small ordinary values lose resolution and collapse onto a few codes.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 23-24</span>
+              <span class="tag accent">Failure mode</span>
+              <span class="tag violet">Outliers</span>
+            </div>
+            <h3>The reason naive INT8 degrades is not that all values are hard to quantize. It is that a few outliers can force the shared scale to become so coarse that the ordinary values lose their detail</h3>
+            <p>
+              The information-loss slides make the lecture’s central error story concrete.
+              Quantization error is always nonzero in general, but it becomes especially bad when the scale is set by an outlier.
+              The toy example shows exactly what happens.
+              Without a huge outlier, both absmax and zero-point reconstruct values like \(-0.3\), \(0.1\), \(0.2\), and \(0.4\) almost perfectly.
+              Add a single value of \(100\), and the grid must stretch to cover it.
+              Now the smaller numbers are forced onto a much coarser staircase, so many distinct values round to almost the same code.
+              That is the missing intuition behind most quantization failures in large models.
+            </p>
+            <div class="formula-box">
+              <p>The step size is the real villain. Roughly:</p>
+              <p>\[
+                \Delta_{\mathrm{absmax}} \approx \frac{\max |x|}{127},
+                \qquad
+                \Delta_{\mathrm{zp}} \approx \frac{x_{\max}-x_{\min}}{255}.
+              \]</p>
+              <p>If one outlier makes \(\max |x|\) or \(x_{\max}-x_{\min}\) huge, then every non-outlier is quantized on a much coarser grid.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this matters</strong>
+                <p>This is why “just use 8-bit” is not a full answer. The error is not evenly distributed; it is dominated by where the scale was chosen and which values set the range.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>Imagine forcing both pennies and hundred-dollar bills onto the same ruler. The ruler must be long enough for the hundred-dollar bill, so the pennies become indistinguishable.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Why vector-wise quantization helps</strong>
+                <p>Using separate scales for rows, columns, or groups localizes the damage. One pathological vector no longer sets the range for the entire tensor.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked where quantization error comes from, do not stop at “rounding.” The deeper answer is shared scaling plus clipping or rounding, especially when outliers distort the chosen range.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-19-llm-int8">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-19-quantization/slide-27-llm-int8-decomposition.png" alt="Slide illustrating LLM.int8, where regular values are handled with vector-wise INT8 quantization and a tiny outlier subset is decomposed and computed in FP16 before being merged back">
+              <figcaption>Slides 25-27. <code>LLM.int8()</code> does not abandon INT8; it isolates the rare outlier features and handles only those in higher precision.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-19-quantization/slide-28-llm-int8-accuracy.png" alt="Graph showing that a plain 8-bit baseline loses zeroshot accuracy once outlier features emerge in larger models, while LLM.int8 tracks the 16-bit baseline much more closely">
+              <figcaption>Slides 28-29. The accuracy plot is the lecture’s evidence that the outlier story is not cosmetic: the naive 8-bit baseline falls apart as large-model outliers emerge, while <code>LLM.int8()</code> stays close to the 16-bit baseline.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 25-29</span>
+              <span class="tag accent">Directly quiz-tested</span>
+              <span class="tag blue">Mixed precision</span>
+            </div>
+            <h3><code>LLM.int8()</code> is the lecture’s key repair strategy: quantize almost everything, but do not force the tiny outlier subspace onto the same low-precision path as ordinary features</h3>
+            <p>
+              The deck reports that transformer LMs contain outlier activation features, meaning a small set of activation columns become unusually large.
+              In models of at least 6.7B parameters, the slides say an outlier occurs in every layer.
+              The hypothesis is then simple: standard INT8 fails because those outliers wreck the shared scale.
+              <code>LLM.int8()</code> responds with a mixed-precision decomposition.
+              Regular values use vector-wise INT8 quantization and low-bit matrix multiplication.
+              The outlier features are split off and computed in higher precision, then merged back into the final result.
+              The lecture emphasizes that only about \(0.1\%\) of activation features are outliers, so most of the memory benefit remains.
+              That is why Quiz 5 treats this as the central takeaway rather than as a niche engineering trick.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the results slides are saying</strong>
+                <p>The zeroshot-accuracy curve and perplexity table show that naive 8-bit quantization becomes much worse once large-model outliers emerge, while <code>LLM.int8()</code> stays close to 16-bit quality.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why it works</strong>
+                <p>The method avoids wasting the whole quantization budget on a tiny pathological subset. Most values stay cheap, while the rare dangerous features get the precision they need.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What remains high precision</strong>
+                <p>Not all weights go back to FP16. Only the computations involving the detected outlier features stay higher precision; the rest still use the low-bit path.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The improvement is not “a better rounding function.” The whole point is selective mixed precision based on outlier structure. That is exactly why the correct quiz answer mentions high-precision computation for a small outlier subset.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-19-deployment">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 30-35</span>
+              <span class="tag accent">Practical deployment</span>
+              <span class="tag success">Lower-priority but useful</span>
+            </div>
+            <h3>The GGML, GGUF, and llama.cpp slides are less about memorizing product names and more about understanding how real local inference stacks package quantization choices</h3>
+            <p>
+              This block is easy to overread as a list of tools, but the conceptual message is useful.
+              GGML is the tensor library and quantization-kernel layer.
+              GGUF is the file format that stores the model architecture and tensor data.
+              Llama.cpp is the inference runtime that uses those pieces.
+              The Q4_K example matters because it shows what practical quantization often looks like: group weights into blocks, quantize them to low bits, and still store block-level scales and offsets as side information.
+              The Q4_K_M example adds an even more important systems lesson: some tensors are sensitive enough that real deployments keep them at higher precision than the headline bit-width.
+              The lecture’s screenshot of Qwen3-8B GGUF variants reinforces that “a 4-bit model” is really a family of backend-specific quantization recipes, not one universal representation.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this matters</strong>
+                <p>Deployment quantization is rarely one global rule applied uniformly to every tensor. Real systems mix precisions, group sizes, scales, and backends to balance size and quality.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Library versus format versus runner</strong>
+                <p>GGML is the computation layer, GGUF is the storage format, and llama.cpp is the inference engine. Keeping those roles distinct prevents a lot of confusion.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What not to over-memorize</strong>
+                <p>You probably do not need to memorize the exact block sizes of Q4_K. The main lesson is that practical schemes use per-block metadata and often leave some sensitive tensors at higher precision.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Tradeoff reminder</strong>
+                <p>Smaller files help local deployment, but the best bit-width depends on hardware backend, kernel support, and how much accuracy loss the application can tolerate. There is no single “best” quantization level independent of deployment context.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-19-training">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-19-quantization/slide-38-qat-fake-quantization.png" alt="Slide showing quantization-aware training, where fake quantization inserts a quantize-dequantize operation during training so the model learns under quantization noise">
+              <figcaption>Slides 37-38. QAT inserts fake quantization into the graph during training, so the model learns while seeing the same kind of noise it will face at quantized inference time.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-19-quantization/slide-40-qlora-memory.png" alt="Slide comparing LoRA and QLoRA, where QLoRA uses a 4-bit base transformer with offloaded state while training higher-precision adapters">
+              <figcaption>Slide 40. QLoRA uses quantization for a different purpose from QAT: not accuracy recovery for low-bit inference, but fitting fine-tuning onto smaller GPUs by keeping the base model quantized.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 37-40</span>
+              <span class="tag accent">Training-time quantization</span>
+              <span class="tag blue">Quiz-aligned</span>
+            </div>
+            <h3>The last part of the lecture separates two different training-time stories that students often blur together: QAT teaches a model to survive later quantized inference, while QLoRA uses quantization to make fine-tuning fit in memory</h3>
+            <p>
+              QAT is motivated by the idea that post-training quantization can degrade accuracy because the model was never trained to tolerate that low-bit noise.
+              The fix is to insert fake quantization, meaning quantize-dequantize operations, into the computational graph during training.
+              Training still happens in floating point, but the forward pass now exposes the model to the distortions created by later quantized inference.
+              QLoRA solves a different problem.
+              Its goal is not mainly to recover inference accuracy; it is to reduce the GPU memory needed for fine-tuning large models.
+              The slide’s diagram shows the key picture: compare ordinary LoRA with a 16-bit base transformer to QLoRA with a 4-bit base transformer, higher-precision adapter updates, and offloaded or paged state.
+              In other words, QAT is about robustness to quantization noise, while QLoRA is about training feasibility under memory constraints.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>QAT</strong>
+                <p>Insert fake quantization during training so the parameters can adapt to the noise pattern introduced by later low-bit inference. This is why Quiz 5 says the main effect is exposure to quantization noise, not integer-only training.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>QLoRA</strong>
+                <p>Keep the large base model quantized and train small adapter-style updates, with memory offloading to reduce GPU pressure. The point is to make fine-tuning fit on smaller hardware.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What stays high precision</strong>
+                <p>In QAT, the training computation is still fundamentally float-based even though fake quantization is inserted. In QLoRA, the trainable adapters and some optimizer-related state remain higher precision while the frozen base model is quantized.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Do not answer a QAT question with a QLoRA story or vice versa. QAT is an accuracy-recovery technique for later quantized inference; QLoRA is a memory-saving fine-tuning recipe.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-19-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the Lecture 19 terms most worth being able to define quickly and precisely.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>Quantization</strong>
+          <p>Mapping values from a larger, higher-precision set to a smaller, lower-precision set such as FP16 to INT8.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Quantization Error</strong>
+          <p>The difference between the original value and the quantized then dequantized value after scaling, rounding, and possible clipping.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Scale</strong>
+          <p>The factor that maps a floating-point range onto an integer grid and back again.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Zero-point / Offset</strong>
+          <p>An additive offset used in asymmetric quantization so the floating-point range does not have to be centered at zero.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Absmax Quantization</strong>
+          <p>A symmetric quantization rule that scales by the maximum absolute value so the data fit into the signed INT8 range.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Zero-point Quantization</strong>
+          <p>An asymmetric quantization rule that uses both a scale and an offset to map \([x_{\min}, x_{\max}]\) into INT8.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Vector-wise Quantization</strong>
+          <p>Using separate quantization scales for different rows, columns, or vectors rather than one scale for the whole tensor.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Outlier Feature</strong>
+          <p>An activation dimension whose values are much larger than the others, making shared-scale quantization much less accurate.</p>
+        </article>
+        <article class="glossary-card">
+          <strong><code>LLM.int8()</code></strong>
+          <p>A mixed-precision method that quantizes most computation to INT8 but keeps a tiny outlier subset in higher precision.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Quantization-Aware Training (QAT)</strong>
+          <p>Training with fake quantization in the graph so the model learns to tolerate later low-bit inference noise.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>QLoRA</strong>
+          <p>A memory-efficient fine-tuning recipe that keeps the base model quantized while training adapter-style updates.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>GGUF</strong>
+          <p>A file format used in the local-inference ecosystem for storing quantized model tensors and model metadata.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Lecture 19 reframes large-model efficiency as a representation problem: fewer bits mean smaller weights, lower memory traffic, and broader deployability.</li>
+            <li>Floating-point formats keep per-number dynamic range through exponents; integer quantization replaces that flexibility with a shared scale and therefore introduces approximation error.</li>
+            <li>Absmax is a simple symmetric INT8 scheme, while zero-point handles asymmetric ranges better by adding an offset.</li>
+            <li>Outliers are the key failure mode because they stretch the shared grid so much that ordinary values lose resolution.</li>
+            <li><code>LLM.int8()</code> fixes that by using mixed precision: most features stay INT8, while a tiny outlier subset stays higher precision.</li>
+            <li>QAT and QLoRA are both training-time uses of quantization, but QAT is about adapting to quantization noise and QLoRA is about making fine-tuning fit in memory.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>Exam-oriented comparisons</strong>
+          <ul>
+            <li><strong>FP16 / BF16 vs INT8</strong>: FP16 and BF16 are still floating point; INT8 needs a shared scaling rule and therefore loses more information.</li>
+            <li><strong>Absmax vs zero-point</strong>: absmax is symmetric and simple; zero-point is asymmetric and uses the full range better when values are not centered at zero.</li>
+            <li><strong>Global vs vector-wise quantization</strong>: vector-wise uses more local scales, so one bad vector cannot distort the whole tensor.</li>
+            <li><strong>Naive INT8 vs <code>LLM.int8()</code></strong>: naive INT8 sends all features through the same low-bit path; <code>LLM.int8()</code> keeps only the rare outlier subset high precision.</li>
+            <li><strong>Inference-time quantization vs QAT</strong>: inference-time PTQ quantizes an already trained model; QAT retrains with fake quantization so the model adapts.</li>
+            <li><strong>QAT vs QLoRA</strong>: QAT targets accuracy under low-bit inference, while QLoRA targets memory-efficient fine-tuning.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-19-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>Why is quantization mostly a memory and bandwidth story before it is a pure arithmetic-speed story?</li>
+            <li>What information does floating point keep that a shared-scale INT8 representation throws away?</li>
+            <li>When would zero-point quantization be better than absmax, and why?</li>
+            <li>Why do outlier features create disproportionate quantization error in large transformers?</li>
+            <li>What is the exact high-level idea behind <code>LLM.int8()</code>, and why is “better rounding” the wrong explanation?</li>
+            <li>How do QAT and QLoRA use quantization differently, and what problem is each one solving?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
     <div class="footer">
-      This site now covers <code>anlp-s2026-11-multimodal.pdf</code>, <code>anlp-s2026-12-multimodal-ii.pdf</code>, <code>anlp-s2026-15-multimodal-iii.pdf</code>, <code>anlp-s2026-16-rl.pdf</code>, and <code>anlp-s2026-17-rl-llms.pdf</code> in one reusable lecture-by-lecture scaffold.
+      This site now covers <code>anlp-s2026-11-multimodal.pdf</code>, <code>anlp-s2026-12-multimodal-ii.pdf</code>, <code>anlp-s2026-15-multimodal-iii.pdf</code>, <code>anlp-s2026-16-rl.pdf</code>, <code>anlp-s2026-17-rl-llms.pdf</code>, <code>anlp-s2026-18-zora.pdf</code>, and <code>anlp-s2026-19-quantization.pdf</code> in one reusable lecture-by-lecture scaffold.
       The shared root <code>index.html</code>, shared assets under <code>assets/</code>, and tabbed lecture panels are set up so future lecture companions can plug into the same structure cleanly.
     </div>
   </main>
