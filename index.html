@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ANLP Study Partner</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)'], ['$', '$']],
+        displayMath: [['\\[', '\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script defer src="assets/app.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <span class="eyebrow">ANLP Spring 2026 · Study Partner</span>
+      <h1>Lecture 11: Multimodal Modeling I</h1>
+      <p>
+        This companion is for a student who missed lecture and needs the missing connective tissue between the slides.
+        It compresses <code>materials/anlp-s2026-11-multimodal.pdf</code> into the ideas most likely to matter on an exam:
+        how images become token-like vectors, why ViTs are the default visual backbone, what CLIP actually optimizes,
+        how LLaVA-style systems connect vision encoders to decoder LMs, and what Molmo and PaliGemma teach us about
+        token budgets and fine-tuning choices.
+      </p>
+      <div class="hero-grid">
+        <article class="hero-card">
+          <strong>What this lecture is really about</strong>
+          <p>The core problem is representation. A language model already knows how to process a sequence of vectors, so the entire lecture asks how to turn pixels into a sequence that preserves enough spatial and semantic information to support reasoning and generation.</p>
+        </article>
+        <article class="hero-card">
+          <strong>Quiz-calibrated focus</strong>
+          <p>The answer keys in <code>materials/quizzes/</code> suggest the course tests architecture mechanics and objective interpretation more than historical trivia. That is why these notes emphasize patch counts, attention scaling, the CLIP loss, and what practical ablations imply.</p>
+        </article>
+        <article class="hero-card">
+          <strong>Compression strategy</strong>
+          <p>Intro slides, repeated agenda slides, blank transition slides, and pure example screenshots are folded into the concept blocks below. The retained material is concentrated in slides 8-16, 20-24, 26-28, and 31-44.</p>
+        </article>
+      </div>
+    </section>
+
+    <nav class="lecture-tabs" aria-label="Lecture tabs">
+      <a class="lecture-tab active" data-lecture-tab="lecture-11-multimodal" href="#lecture-11-multimodal">Lecture 11 · Multimodal I</a>
+      <span class="lecture-tab inactive" aria-disabled="true">Future lecture sections plug in here</span>
+    </nav>
+
+    <section id="lecture-11-multimodal" data-lecture-panel="lecture-11-multimodal">
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        The lecture has a clean narrative arc: first solve the representation problem for images, then learn strong image features from text, then pipe those image features into a language model, and finally compare the engineering choices real systems make once token budget and sample efficiency become bottlenecks.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Given patch size \(P\), compute the number of ViT tokens and reason about the \(\mathcal{O}(N^2)\) attention cost.</li>
+            <li>Explain the CLIP objective in words: correct image-text pairs go up, mismatched pairs in the batch go down.</li>
+            <li>Explain why CLIP enables zero-shot classification.</li>
+            <li>Describe the standard vision encoder → projector → decoder LM pipeline.</li>
+            <li>Interpret why pretrained image encoders and joint fine-tuning help in PaliGemma-style systems.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 1-7 and 45-47 are framing, examples, or closing material, so they are captured indirectly rather than treated as standalone study blocks.</li>
+            <li>Slides 12, 14, 15, and 16 are folded into one ViT interpretation section instead of four separate notes.</li>
+            <li>Slides 26 and 28 are merged into the CLIP section because both support the same take-home message: contrastive pretraining gives transferable features.</li>
+            <li>Slides 37-41 are merged into one Molmo data-and-task lesson, since the individual screenshots mostly illustrate the same point.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_3_answer_key.pdf</code> directly tests ViT patch scaling and CLIP’s batch contrastive objective.</li>
+            <li>The quiz style favors “what changes if I modify this architecture or objective?” reasoning.</li>
+            <li>That calibration is why each concept block below includes both the intuition and the most likely misunderstanding.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-11-problem">Problem Setup</a>
+        <a href="#lecture-11-vit">ViT</a>
+        <a href="#lecture-11-clip">CLIP</a>
+        <a href="#lecture-11-vlm">VLM Pipeline</a>
+        <a href="#lecture-11-molmo">Molmo</a>
+        <a href="#lecture-11-lessons">Design Lessons</a>
+        <a href="#lecture-11-glossary">Glossary</a>
+        <a href="#lecture-11-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card no-media full-width jump-target" id="lecture-11-problem">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slide 8</span>
+              <span class="tag accent">Core setup</span>
+              <span class="tag blue">Testable framing</span>
+            </div>
+            <h3>The lecture begins with the right question: how do we turn an image into the kind of object a language model can use?</h3>
+            <p>
+              The slide says that text models already operate on a sequence of vectors, so a multimodal system needs an image encoder
+              \(f_{\mathrm{enc}}(x_{\mathrm{image}}) \rightarrow z_1, \dots, z_L\). This is not just notation. It is the design problem that
+              determines almost everything downstream: what the tokens mean, how much spatial detail survives, how expensive the model is,
+              and how easily the model can share information across vision and language.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is important</strong>
+                <p>Without a learned image representation, a language model has no principled way to map a two-dimensional pixel grid into the one-dimensional token stream it expects.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>Text arrives already chunked into tokens. Images do not. Multimodal modeling starts by inventing the visual analogue of tokens.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Missing context</strong>
+                <p>Image “tokens” are usually continuous vectors, not discrete vocabulary items. They also need some positional signal, because a flattened sequence otherwise loses the image’s spatial layout.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If a question asks what multimodal modeling adds beyond a plain LM, the clean answer is: a vision representation architecture plus a learning objective that makes those vectors useful.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-11-vit">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-11-multimodal/slide-10-vit-patches.png" alt="Slide showing how a Vision Transformer divides an image into patches, flattens them, and projects them into patch embeddings">
+            <figcaption>Slides 9-10. ViT turns an image into a sequence by patchifying first and contextualizing later.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 9-16</span>
+              <span class="tag accent">ViT mechanics</span>
+              <span class="tag blue">Quiz-aligned</span>
+            </div>
+            <h3>ViT solves the representation problem by treating image patches like tokens</h3>
+            <p>
+              ViT divides an image \(x_{\mathrm{image}} \in \mathbb{R}^{H \times W \times C}\) into \(N = \frac{HW}{P^2}\) square patches of side length \(P\).
+              Each patch is flattened into a vector in \(\mathbb{R}^{P^2 C}\), linearly projected into dimension \(D\), and then combined with position embeddings.
+              After that, the model is just a transformer operating on a sequence of visual token vectors.
+            </p>
+            <div class="formula-box">
+              <p>The two formulas worth memorizing are the token count and the scaling implication.</p>
+              <p>\[
+                N = \frac{HW}{P^2}
+                \qquad\text{and}\qquad
+                \text{self-attention cost} \propto N^2.
+              \]</p>
+              <p>If you halve the patch size while keeping image resolution fixed, the number of tokens becomes \(4N\), so the attention cost becomes \(16\times\) larger. That exact reasoning already appears in the quiz set.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Patchification makes images compatible with transformer machinery, while self-attention lets the model combine information from different parts of the image before classification or downstream use.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why it works</strong>
+                <p>Each patch starts as a local snapshot, but the transformer can build global context by letting each patch attend to others. That is why ViT can identify salient regions instead of relying only on local convolutions.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What the figure-heavy slides add</strong>
+                <p>The later ViT slides show three qualitative facts: learned position embeddings preserve spatial regularity, attention highlights task-relevant regions, and deeper layers tend to aggregate information over larger spatial spans.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Patch size is not a harmless implementation detail. Smaller patches preserve finer detail, but they explode token count and compute.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-11-clip">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-11-multimodal/slide-24-clip-loss.png" alt="Slide showing the CLIP loss as two cross-entropy terms that raise similarity for matching image-text pairs and lower similarity for mismatched pairs">
+            <figcaption>Slides 23-24. The batch itself supplies the negative pairs that make CLIP contrastive.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 20-24, 26, 28</span>
+              <span class="tag accent">CLIP</span>
+              <span class="tag blue">Very likely tested</span>
+            </div>
+            <h3>CLIP learns image representations from language by aligning matching image-text pairs in a shared space</h3>
+            <p>
+              The lecture motivates CLIP by contrasting it with older image pretraining that used only class labels. A caption carries much richer information than a single class name, and web-scale image-text pairs are easier to scale than hand-labeled classification datasets.
+              CLIP therefore learns an image encoder \(f_I(x)\) and a text encoder \(f_T(y)\) whose outputs have high similarity when the image and caption match and low similarity when they do not.
+            </p>
+            <div class="formula-box">
+              <p>The key idea is easier to remember in words than in symbols:</p>
+              <p>\[
+                \text{raise } f_I(x_n)^\top f_T(y_n)
+                \quad\text{and lower}\quad
+                f_I(x_j)^\top f_T(y_n),\;
+                f_I(x_n)^\top f_T(y_j)
+              \]</p>
+              <p>for mismatched pairs in the same batch. The displayed loss is just two cross-entropy terms, one softmaxing over images and one softmaxing over text.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why it matters</strong>
+                <p>Once images and text live in a compatible embedding space, the model can transfer to new tasks without retraining a task-specific classifier.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Zero-shot intuition</strong>
+                <p>At inference time, you can embed an image and several candidate text prompts such as “a photo of a dog” or “a photo of a bird,” then choose the text with highest similarity.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Exam takeaway</strong>
+                <p>The course already asks about this objective directly. If a question asks what the loss is doing, say: maximize similarity of the correct pair and minimize similarity of incorrect batch pairings.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>CLIP is not trained to generate captions token by token. It is a contrastive representation learner, not an autoregressive captioning model.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-11-vlm">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-11-multimodal/slide-42-paligemma-architecture.png" alt="Slide showing a PaliGemma-style multimodal architecture with a contrastive vision encoder, linear projection, and a Gemma decoder model">
+            <figcaption>Slides 31-33 and 42. A modern vision-language model usually inserts image features into the LM through a projector rather than feeding raw pixels directly.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 31-33, 42</span>
+              <span class="tag accent">LLaVA-style pipeline</span>
+              <span class="tag violet">Architecture</span>
+            </div>
+            <h3>A multimodal assistant is usually a decoder LM wrapped around a pretrained vision encoder</h3>
+            <p>
+              The lecture’s LLaVA section gives the canonical recipe. First preprocess the image into patches. Then run a pretrained vision encoder such as a CLIP or SigLIP ViT to obtain a sequence of image vectors.
+              Those vectors are linearly projected into the language model’s embedding dimension and inserted alongside ordinary text tokens. The decoder LM then continues doing what it already knows how to do: autoregressively generate text.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>“Image tokens” are usually not raw pixels. They are vectors extracted by a pretrained visual backbone and then translated into the LM’s representational space.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why the projector exists</strong>
+                <p>The vision encoder and the LM were not trained with the same hidden size or embedding geometry. The projector is a learned adapter that lets the LM read the visual features.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Training detail worth remembering</strong>
+                <p>When the lecture says “for image positions, skip the loss,” the point is that the model is trained to produce textual outputs, not to predict the image vectors themselves as next tokens.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>The presence of a language model does not mean the system has learned vision from scratch. In most practical multimodal systems, the heavy visual lifting is still done by the pretrained image encoder.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-11-molmo">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-11-multimodal/slide-36-molmo-pooling.png" alt="Slide showing how Molmo uses a CLIP ViT, pools 2 by 2 patch groups, and combines a full image with crops to create a smaller sequence of image vectors">
+            <figcaption>Slides 35-37. Molmo is a good example of the token-budget problem: preserve detail, but do not flood the LM with vision tokens.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 35-41</span>
+              <span class="tag accent">Molmo</span>
+              <span class="tag success">Practical design</span>
+            </div>
+            <h3>Molmo shows that practical multimodal systems are constrained by token budget, not just model elegance</h3>
+            <p>
+              The most important Molmo slide is the image-encoding one. A 336 by 336 image with a ViT-L/14 encoder yields a 24 by 24 grid of features.
+              Molmo then pools each 2 by 2 patch group, shrinking that to a 12 by 12 grid before projecting into the LM’s space.
+              It also processes one full image and many crops, which gives the system both global context and local detail.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is true</strong>
+                <p>High-resolution vision features are useful, but an LM has a finite context budget. Pooling and crop selection are ways to spend that budget more intelligently.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Intuition</strong>
+                <p>The full image answers “what is the scene?” while the crops answer “what small object or text might I miss if I only look globally?”</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>What the later Molmo slides imply</strong>
+                <p>The dataset slides show that capability comes from task diversity too: captions, OCR-flavored questions, pointing, and synthetic data all teach different behaviors.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked how real systems differ from the clean lecture pipeline, a strong answer is: they compress, pool, crop, and curate data because raw visual tokens are too expensive.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-11-lessons">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-11-multimodal/slide-43-paligemma-ablation.png" alt="Slide showing a PaliGemma ablation where updating both the image encoder and language model performs best">
+              <figcaption>Slide 43. Jointly tuning the image encoder and the LM outperforms freezing or resetting major components.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-11-multimodal/slide-44-raw-patches.png" alt="Slide showing that removing the image encoder and passing projected raw patches to the language model works but is less sample efficient">
+              <figcaption>Slide 44. Raw patches can work, but they are much less sample-efficient than using a pretrained image encoder.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 43-44</span>
+              <span class="tag accent">Design lessons</span>
+              <span class="tag blue">Ablation logic</span>
+            </div>
+            <h3>The closing lesson is not “any vision interface works”; it is that pretrained visual structure and coordinated fine-tuning matter a lot</h3>
+            <p>
+              The PaliGemma ablations make two qualitative points. First, updating both the image encoder and the language model gives the best performance.
+              Freezing or resetting important components hurts, which means the multimodal interface is not just a superficial wrapper around two independent pretrained models.
+              Second, you can remove the image encoder and feed projected raw RGB patches directly to the LM, but doing so is much less sample-efficient.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this matters</strong>
+                <p>A pretrained contrastive image encoder already knows useful visual abstractions. Throwing that away forces the LM to relearn vision from weaker supervision.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Best mental model</strong>
+                <p>The image encoder provides compressed visual semantics; the LM provides linguistic fluency and instruction following. Strong multimodal systems need both parts to cooperate.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Exam takeaway</strong>
+                <p>If a question asks what the ablations show, the safest answer is: pretrained vision features help, joint tuning helps, and raw patches are possible but data-hungry.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>“Raw patches can work” does not mean the encoder is unnecessary in practice. The slide’s point is about efficiency and optimization, not about proving that all designs are equally good.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-11-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the terms most worth being able to define cleanly under time pressure.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>Patch</strong>
+          <p>A square chunk of the image. ViT uses patches as the visual analogue of tokens.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Patch embedding</strong>
+          <p>The vector produced by flattening a patch and applying a learned linear projection.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Shared embedding space</strong>
+          <p>A space where image and text vectors can be compared directly, typically by dot product or cosine similarity.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Contrastive loss</strong>
+          <p>An objective that pulls matching items together and pushes mismatched items apart.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Image tokens</strong>
+          <p>Continuous vectors representing visual content that are supplied to the language model.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Projector</strong>
+          <p>The learned mapping that converts vision-encoder features into the LM’s embedding dimension.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Zero-shot classification</strong>
+          <p>Classifying an image by comparing it to text prompts without training a dedicated classifier for that label set.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Sample efficiency</strong>
+          <p>How much data a method needs to reach a given performance level. The raw-patch result is worse on this dimension.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Multimodal modeling starts with representation: convert pixels into a sequence of informative vectors.</li>
+            <li>ViT does this with patchification, projection, position embeddings, and transformer context mixing.</li>
+            <li>CLIP learns strong image representations by contrasting matched and mismatched image-text pairs at scale.</li>
+            <li>LLaVA-style systems usually reuse those pretrained image features and bridge them into a decoder LM through a projector.</li>
+            <li>Real systems win or lose on token budget, data mixture, and fine-tuning decisions, not just on the high-level diagram.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>What is most likely to be tested</strong>
+          <ul>
+            <li>Patch-count reasoning and the quadratic cost of attention in ViT.</li>
+            <li>The meaning of the CLIP loss and the role of in-batch negatives.</li>
+            <li>Why zero-shot classification becomes possible after contrastive alignment.</li>
+            <li>Why image tokens need a projector before entering the LM.</li>
+            <li>Why pretrained image encoders and joint tuning outperform learning from raw patches alone.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-11-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>If patch size goes from \(P\) to \(P/2\), how do token count and attention cost change?</li>
+            <li>In CLIP, where do the negative pairs come from when training on a batch of paired data?</li>
+            <li>Why does CLIP support zero-shot classification without training a new classifier head?</li>
+            <li>What job does the linear projector play in a vision-language model?</li>
+            <li>Why might a system use both a full image and several crops?</li>
+            <li>What do the PaliGemma ablations suggest about freezing, tuning, and removing the image encoder?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <div class="footer">
+      This site now covers <code>anlp-s2026-11-multimodal.pdf</code> in a lecture-by-lecture scaffold that can grow over time. The active lecture lives at the root <code>index.html</code>, uses shared assets under <code>assets/</code>, and is ready for additional lecture tabs and sections later.
+    </div>
+  </main>
+</body>
+</html>
