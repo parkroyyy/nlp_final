@@ -25,7 +25,7 @@
       <span class="eyebrow">ANLP Spring 2026 · Study Partner</span>
       <h1>ANLP Lecture Companions</h1>
       <p>
-        This companion now covers four lecture decks in the repo’s shared HTML study site.
+        This companion now covers five lecture decks in the repo’s shared HTML study site.
         It is written for a student who missed class and needs the missing connective tissue the slides assume:
         what the models are optimizing, why the engineering choices make sense, where the hidden tradeoffs are,
         and which concepts are most likely to show up on a quiz or final.
@@ -48,6 +48,10 @@
           <p>The fourth lecture explains why language-model imitation learning is not enough for reward-driven tasks, then builds the RL toolkit the course keeps reusing: MDPs, REINFORCE, discounting, baselines, advantages, and PPO.</p>
         </article>
         <article class="hero-card">
+          <strong>Lecture 17 focus</strong>
+          <p>The fifth lecture carries that RL toolkit into LLM post-training: one-step versus token-level MDPs, verifiable rewards and RLVR, GRPO-style advantages, math-reasoning RL, and the RLHF pipeline with reward models, reward hacking, and KL control.</p>
+        </article>
+        <article class="hero-card">
           <strong>Quiz-calibrated style</strong>
           <p>The quiz answer keys suggest the course rewards mechanism-level reasoning more than paper-name recall, so the notes below prioritize objectives, estimators, scaling arguments, and what changes when a design choice changes.</p>
         </article>
@@ -59,6 +63,7 @@
       <a class="lecture-tab inactive" data-lecture-tab="lecture-12-multimodal-ii" href="#lecture-12-multimodal-ii">Lecture 12 · Multimodal II</a>
       <a class="lecture-tab inactive" data-lecture-tab="lecture-15-multimodal-iii" href="#lecture-15-multimodal-iii">Lecture 15 · Multimodal III</a>
       <a class="lecture-tab inactive" data-lecture-tab="lecture-16-rl" href="#lecture-16-rl">Lecture 16 · RL</a>
+      <a class="lecture-tab inactive" data-lecture-tab="lecture-17-rl-llms" href="#lecture-17-rl-llms">Lecture 17 · RL for LLMs</a>
     </nav>
 
     <section class="lecture-panel" id="lecture-11-multimodal" data-lecture-panel="lecture-11-multimodal">
@@ -1684,8 +1689,491 @@
       </div>
     </section>
 
+    <section class="lecture-panel" id="lecture-17-rl-llms" data-lecture-panel="lecture-17-rl-llms">
+      <div class="lecture-header">
+        <span class="eyebrow">Lecture 17</span>
+        <h2>Reinforcement Learning for LLMs</h2>
+        <p class="section-copy">
+          This section compresses <code>materials/anlp-s2026-17-rl-llms.pdf</code> into the post-training ideas most likely to matter on an exam:
+          how Lecture 16’s RL setup becomes an LM pipeline, when to use one-step versus token-level MDPs, why verifiable rewards and RLVR are the cleanest starting point,
+          what GRPO-style group advantages are doing, how math-reasoning RL fits the same template, and why RLHF is a multi-stage pipeline with a Bradley-Terry reward model,
+          PPO optimization, and a KL anchor to a reference policy.
+        </p>
+      </div>
+
+      <h2 class="section-title">Roadmap</h2>
+      <p class="section-copy">
+        Lecture 17 is best read as the continuation of Lecture 16, not a brand-new subject.
+        The first slides translate the generic RL loop into LM-specific modeling choices: what the state and action are, whether the action is a whole response or one token, and where the reward comes from.
+        The middle third uses string reversal and math reasoning to show the simplest regime, where correctness is automatically checkable and RL can optimize a verifiable reward.
+        The final third shifts to alignment with human preferences, where the reward is not directly available and must be approximated by a learned reward model, which creates both a useful pipeline and the new failure mode of reward hacking.
+      </p>
+
+      <div class="overview-grid">
+        <article class="overview-card">
+          <strong>Likely exam targets</strong>
+          <ul>
+            <li>Map an LM post-training problem into state, action, policy, transition, and reward for both one-step and token-level MDPs.</li>
+            <li>Explain why supervised fine-tuning before RL is often called a “cold start” stage and why it helps exploration.</li>
+            <li>Define RLVR and give examples of verifiable rewards for reversal, math, or code.</li>
+            <li>Explain what group-based advantages are doing and why GRPO avoids a learned value baseline.</li>
+            <li>Write and interpret the Bradley-Terry / preference-model loss \(-\log \sigma(r(y^+) - r(y^-))\).</li>
+            <li>Explain reward hacking and why RLHF usually adds a reference-policy KL penalty on top of PPO.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>What was merged or omitted</strong>
+          <ul>
+            <li>Slides 2-9 are merged into one framework block because they all support the same translation question: what changes when RL is applied to an LM?</li>
+            <li>Slides 11-28 become two study blocks: one for verifiable rewards and one for group-based PPO, with the code slides and the result slide folded into those explanations.</li>
+            <li>Slides 30-35 are kept as one math-reasoning case study instead of separate notes for the data table, the accuracy plot, and the long-response example.</li>
+            <li>Slides 39-48 are compressed into one reward-source block and one RLHF pipeline block, because the direct-assessment and preference-collection slides all feed the same story.</li>
+            <li>Slides 61-62 become one exam-oriented comparison card, and slides 63-66 are omitted as tool pointers rather than examinable concepts.</li>
+          </ul>
+        </article>
+        <article class="overview-card">
+          <strong>Why the quiz files mattered</strong>
+          <ul>
+            <li><code>ANLP_quiz_4_answer_key.pdf</code> directly tests the Bradley-Terry loss, so the reward-model block below keeps the derivation punchline rather than only naming the objective.</li>
+            <li>The same quiz’s RLVR bonus question is about how sequence-level rewards and normalization affect length bias, so the GRPO block explicitly warns about that even though the slide deck keeps the treatment brief.</li>
+            <li>The quizzes consistently reward “what changes if I alter the reward, the data source, or the estimator?” reasoning, which is exactly how Lecture 17 organizes RLVR, GRPO, PPO, and RLHF.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="jump-grid" aria-label="Quick jumps">
+        <a href="#lecture-17-framework">Framework</a>
+        <a href="#lecture-17-rlvr">RLVR</a>
+        <a href="#lecture-17-grpo">GRPO</a>
+        <a href="#lecture-17-math">Math RL</a>
+        <a href="#lecture-17-rlhf">RLHF</a>
+        <a href="#lecture-17-bt">Reward Model</a>
+        <a href="#lecture-17-kl">KL Control</a>
+        <a href="#lecture-17-glossary">Glossary</a>
+        <a href="#lecture-17-self-quiz">Self-Quiz</a>
+      </div>
+
+      <div class="concept-list">
+        <article class="concept-card no-media full-width jump-target" id="lecture-17-framework">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 2-9</span>
+              <span class="tag accent">Lecture 16 continuation</span>
+              <span class="tag blue">Framework</span>
+            </div>
+            <h3>Lecture 17 takes the Lecture 16 RL loop and asks which parts become design choices once the policy is a language model</h3>
+            <p>
+              The lecture opens by saying that the generic RL recipe from last class still applies: generate outputs, evaluate reward, and update the model.
+              What changes is the modeling choice around the action space.
+              In a <em>one-step MDP</em>, the model takes one action by generating a full response \(y\) for a prompt \(x\), then receives a sequence-level reward \(r(x,y)\).
+              In a <em>token-level MDP</em>, the state is the prompt plus the current prefix \(s_t = (x, y_{&lt;t})\), the action is the next token \(a_t = y_t\), and the reward can in principle be assigned token by token, though many LM settings still use only a terminal reward.
+              The early slides also make the lecture’s real agenda explicit: initialization, prompt dataset, reward design, and policy-optimization details are the levers that define an RL-for-LLMs method.
+            </p>
+            <div class="formula-box">
+              <p>The same policy can be written in either MDP view:</p>
+              <p>\[
+                \text{one-step: } s = x,\quad a = y,\quad \pi_\theta(a \mid s) = p_\theta(y \mid x),\quad r = r(x,y)
+              \]</p>
+              <p>\[
+                \text{token-level: } s_t = (x, y_{&lt;t}),\quad a_t = y_t,\quad \pi_\theta(a_t \mid s_t) = p_\theta(y_t \mid x, y_{&lt;t}),\quad r_t \text{ often sparse}.
+              \]</p>
+              <p>The point is not that one view is always right. The point is that they make different credit-assignment and engineering assumptions.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>RL for LLMs is not a new family of math. It is Lecture 16’s policy-gradient story, plus explicit choices about what counts as an action, what data prompts are sampled from, and how the reward is obtained.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this matters</strong>
+                <p>If the reward only exists for the completed response, the one-step view is often simpler. If intermediate tokens matter or token-level shaping is available, the token-level view can represent that more faithfully.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Missing context</strong>
+                <p>The distribution you train on is generated by the current policy, not just by the original dataset. That means initialization and prompt selection are not peripheral details; they decide what behavior the policy gets to explore.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If a question asks for the “policy,” “trajectory,” or “reward source” in an LM RL pipeline, answer in LM terms: the policy is the next-token distribution, the trajectory is the sampled completion process, and the reward source is either a verifier or a learned model.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-17-rlvr">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 11-17, 28</span>
+              <span class="tag accent">RLVR</span>
+              <span class="tag violet">Verifiable rewards</span>
+            </div>
+            <h3>Verifiable-reward tasks are the lecture’s cleanest setting because the reward comes from a checker rather than a learned critic</h3>
+            <p>
+              The first example, reversing a string, is intentionally simple.
+              It lets the lecture separate the RL mechanics from the harder question of how to define reward.
+              The model is usually supervised-fine-tuned first on \((x,y)\) pairs, then further optimized with RL under a reward that is easy to verify:
+              \(1\) if the reversal is correct, \(0\) otherwise.
+              The slides then generalize the same idea to math answers and code that passes tests.
+              This is why recent terminology uses <em>Reinforcement Learning with Verifiable Rewards (RLVR)</em>: the reward is supplied by an external checker for correctness, not by humans rating helpfulness and not by a learned reward model guessing human taste.
+            </p>
+            <div class="formula-box">
+              <p>The reward in RLVR is usually something directly checkable, such as:</p>
+              <p>\[
+                r(x,y) \in \{0,1\} \text{ for correctness,}
+                \qquad
+                r(x,y) = \text{fraction of passed tests for code.}
+              \]</p>
+              <p>This is why reversal, math with a checkable final answer, and coding with unit tests appear together in the slides.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why SFT comes first</strong>
+                <p>The “cold start” idea is that RL works better once the model already knows the task format. SFT moves the policy into a region where high-reward samples are at least plausible, which reduces wasted exploration.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why RLVR is attractive</strong>
+                <p>It avoids the biggest RLHF problem: imperfect learned rewards. If correctness is mechanically checkable, the optimization target is much less ambiguous.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Hidden limitation</strong>
+                <p>RLVR only works cleanly when the task has a reliable checker. Many alignment or conversational goals do not, which is why the lecture later turns to preference models.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>RLVR does not mean “no RL algorithm is needed.” It only means the reward source is verified externally. You still need advantages, a loss, and stable optimization.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-17-grpo">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-17-rl-llms/slide-21-group-based-advantages.png" alt="Slide defining group-based advantages by sampling multiple outputs for the same prompt, subtracting the mean reward within the group, and optionally normalizing by the group standard deviation">
+            <figcaption>Slides 19-28. GRPO keeps the PPO-style optimization story but replaces a learned value baseline with within-prompt comparisons across a sampled group.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 19-28</span>
+              <span class="tag accent">GRPO</span>
+              <span class="tag blue">Quiz-calibrated</span>
+            </div>
+            <h3>Group-based advantages say “judge each sampled answer relative to the other answers for the same prompt,” then optimize with PPO</h3>
+            <p>
+              The reversal example then turns into the lecture’s main optimization idea.
+              For each prompt \(x^{(i)}\), sample \(K\) outputs from the current policy, score them, and compare each reward to the group average.
+              That gives a relative advantage signal without training a separate value function.
+              The lecture’s terminology slide summarizes the recipe as <em>GRPO</em>: a PPO-style loss plus group-based advantages, often with group standard-deviation normalization.
+              This is best understood as a direct continuation of Lecture 16’s baseline story.
+              A learned value baseline estimates “what reward was expected here?” using another model; a group-based baseline estimates that same idea using sibling samples from the current policy on the same prompt.
+            </p>
+            <div class="formula-box">
+              <p>The group-relative advantage is:</p>
+              <p>\[
+                A^{(i,k)} = \frac{r^{(i,k)} - \mathrm{mean}(r^{(i,1)}, \dots, r^{(i,K)})}{Z},
+              \]</p>
+              <p>where \(Z\) is often \(1\) or the group standard deviation. The policy update is then fed into a PPO-style clipped objective using those advantages.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why this is useful</strong>
+                <p>It avoids fitting a value model, which is especially appealing when the reward is sparse and you already plan to sample multiple completions per prompt.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Lecture 16 connection</strong>
+                <p>This is still baseline subtraction. The baseline is just prompt-local and sample-based instead of being predicted by a learned critic.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Main tradeoff</strong>
+                <p>You pay for the simpler baseline by generating multiple outputs for each prompt, and the approach gives less direct guidance about how to assign credit inside long trajectories before the final reward is known.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Quiz-calibrated warning</strong>
+                <p>Because sequence-level rewards are often broadcast across all output tokens, extra length normalization can bias training toward shorter or longer answers. Quiz 4’s bonus question suggests the course expects you to reason about that side effect even if the slides do not dwell on it.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-17-math">
+          <div class="figure-stack">
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-17-rl-llms/slide-34-r1-accuracy.png" alt="Slide showing DeepSeek-R1-Zero accuracy increasing during training on a math benchmark as reinforcement learning proceeds">
+              <figcaption>Slide 34. The math example is evidence that RL on verifiable answers can substantially improve search over reasoning traces.</figcaption>
+            </figure>
+            <figure class="concept-figure">
+              <img src="assets/lectures/anlp-s2026-17-rl-llms/slide-35-r1-length.png" alt="Slide showing response lengths increasing during training alongside an example where the model revises its own earlier reasoning">
+              <figcaption>Slide 35. The lecture uses DeepSeek-R1-Zero to show that RL can lengthen reasoning traces and encourage self-correction, though longer responses are not automatically better.</figcaption>
+            </figure>
+          </div>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 30-35</span>
+              <span class="tag accent">Math reasoning</span>
+              <span class="tag success">RLVR case study</span>
+            </div>
+            <h3>Math reasoning keeps the RLVR template but makes the sparse-reward and credit-assignment issues much more visible</h3>
+            <p>
+              The DeepSeek-R1 case study is presented as the same basic recipe on a harder task.
+              The prompt is a math problem, the output is a chain of thought plus an answer, the MDP is still treated as one-step at the sequence level, and the reward combines a checkable final-answer signal with format constraints.
+              The data slide also makes an important broader point: once a task ends in a mechanically checkable output, the same setup can extend beyond pure math to code, STEM multiple choice, logic, and other domains.
+              The plots are not there for memorizing benchmark values.
+              Their conceptual message is that RL can improve final accuracy and can also change <em>how</em> the model searches, for example by producing longer traces and revising intermediate reasoning.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>What the slides are saying</strong>
+                <p>Use a pretrained model, sample full reasoning traces, score them with a verifier, compute group-based or PPO-style updates, and keep a KL-style anchor so the model does not drift too chaotically.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why this connects to Lecture 16</strong>
+                <p>The policy is still the LM, the trajectory is still a sampled completion, and the reward is still delayed. The only difference is that the environment now checks mathematical correctness instead of a game score.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Important caution</strong>
+                <p>Longer chain-of-thought is evidence that the policy changed, not proof that the reward captured genuine reasoning quality. If the checker is weak, the model can still optimize the wrong thing.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam takeaway</strong>
+                <p>If asked why RL can help math despite SFT already knowing the domain, say: RL changes the sampling distribution toward trajectories that end in correct answers, which can improve search and self-correction under sparse terminal rewards.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-17-rlhf">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-17-rl-llms/slide-43-rlhf-pipeline.png" alt="Slide illustrating the three-stage RLHF pipeline: supervised fine-tuning on demonstrations, reward-model training on preference comparisons, and PPO-based reinforcement learning against the reward model">
+            <figcaption>Slides 37-48. RLHF is not one loss written on one slide. It is a pipeline because the desired reward signal has to be constructed before it can be optimized.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 37-48</span>
+              <span class="tag accent">RLHF pipeline</span>
+              <span class="tag violet">Alignment</span>
+            </div>
+            <h3>When correctness is not mechanically verifiable, the lecture switches from RLVR to RLHF: build a reward proxy, then optimize the policy against it</h3>
+            <p>
+              The alignment part of the lecture starts with the question that RLVR cannot answer: how do we reward a chat completion for being helpful, safe, truthful, or honest?
+              One option is a <em>direct assessment model</em> that scores a prompt-response pair directly.
+              Another is a <em>preference model</em>, motivated by the fact that humans often find pairwise comparison easier than assigning an absolute scalar score.
+              RLHF packages this into a three-stage pipeline: first supervised fine-tuning on demonstrations, then reward-model training on chosen-versus-rejected responses, then RL that samples new outputs and optimizes the policy against the learned reward.
+              The large-scale Tulu 3 slide reinforces that this is a data-engineering pipeline as much as an optimization recipe: choose prompts, generate candidate responses, annotate preferences, then train reward and policy models on top of that data.
+            </p>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why it is a pipeline</strong>
+                <p>The reward is not directly given by the environment. It has to be approximated from demonstrations and comparison data before PPO or any other RL algorithm can optimize it.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>What is learned directly</strong>
+                <p>The policy learns to imitate demonstrations in stage 1, the reward model learns to rank responses in stage 2, and stage 3 only indirectly transfers those preference judgments into policy behavior. Stages 1-2 are mostly offline data fitting; stage 3 becomes online again because the current policy must generate fresh samples to optimize.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Preference data source</strong>
+                <p>The lecture explicitly allows either human labelers or a stronger LM to provide rankings. The important point is still the same: preference labels supervise the reward proxy, not the policy tokens directly.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Exam comparison</strong>
+                <p>RLVR and RLHF differ first in reward source, not in the optimizer. Both can use PPO-style updates; RLHF just needs extra steps because the reward itself is learned.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card no-media full-width jump-target" id="lecture-17-bt">
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 49-52</span>
+              <span class="tag accent">Bradley-Terry</span>
+              <span class="tag blue">Directly quiz-tested</span>
+            </div>
+            <h3>Pairwise preference learning says the probability that one answer is preferred should depend on the difference between their reward scores</h3>
+            <p>
+              The reward-model slides answer the “where does this loss come from?” question instead of asking you to memorize it blindly.
+              Given a prompt \(x\) and two responses \(y^+\) and \(y^-\), the reward model \(r_\phi(x,y)\) should assign a higher score to the preferred response.
+              The Bradley-Terry model turns those scores into a comparison probability:
+              if better responses should win pairwise comparisons more often, then the probability of preferring \(y^+\) over \(y^-\) should be a sigmoid of the score difference.
+              Maximizing the likelihood of observed comparisons therefore becomes the familiar negative log-sigmoid loss.
+            </p>
+            <div class="formula-box">
+              <p>The lecture’s reward-model derivation is:</p>
+              <p>\[
+                p(y^+ \succ y^-) =
+                \frac{e^{r_\phi(x,y^+)}}{e^{r_\phi(x,y^+)} + e^{r_\phi(x,y^-)}}
+                =
+                \sigma\!\big(r_\phi(x,y^+) - r_\phi(x,y^-)\big).
+              \]</p>
+              <p>\[
+                \mathcal{L}_{\mathrm{RM}}
+                =
+                - \sum_{(x, y^+, y^-) \in \mathcal{D}}
+                \log \sigma\!\big(r_\phi(x,y^+) - r_\phi(x,y^-)\big).
+              \]</p>
+              <p>Only the score difference matters, which is why the loss is pairwise rather than “classify each response independently.”</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why pairwise labels are popular</strong>
+                <p>People are often more consistent at saying “A is better than B” than at assigning a calibrated numerical score to each answer separately.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>Why the sigmoid appears</strong>
+                <p>The Bradley-Terry parameterization exponentiates latent scores and normalizes them into a two-item probability, which algebraically collapses into a sigmoid over the score difference.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Hidden assumption</strong>
+                <p>The model assumes there is an underlying scalar utility that explains pairwise preferences reasonably well. Real human judgments can violate that assumption, which is one reason reward models are imperfect.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>Do not write this as two separate binary-classification losses on \(y^+\) and \(y^-\). The quiz answer key and the lecture both emphasize that the correct loss depends on the difference \(r(y^+) - r(y^-)\).</p>
+              </article>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept-card jump-target" id="lecture-17-kl">
+          <figure class="concept-figure">
+            <img src="assets/lectures/anlp-s2026-17-rl-llms/slide-55-reward-hacking.png" alt="Slide showing reward increasing while actual downstream performance decreases, illustrating reward hacking">
+            <figcaption>Slides 53-60. Once the reward is learned rather than verified, optimizing it too aggressively can make the policy better at pleasing the reward model while getting worse at the real task.</figcaption>
+          </figure>
+          <div class="concept-copy">
+            <div class="concept-meta">
+              <span class="tag">Slides 53-60</span>
+              <span class="tag accent">Reward hacking</span>
+              <span class="tag success">KL-constrained PPO</span>
+            </div>
+            <h3>RLHF adds a KL anchor because maximizing an imperfect reward model too aggressively invites reward hacking</h3>
+            <p>
+              The lecture’s reward-hacking slides are the conceptual heart of RLHF.
+              If the reward model only imperfectly reflects the real objective, the policy can discover outputs that score well under the model while being bad for users.
+              The simplest classroom example is a toxicity or offensiveness reward that can be “won” by always returning an empty string.
+              The standard mitigation in the lecture is a reference-policy KL penalty:
+              maximize expected learned reward, but pay a cost for moving too far from the SFT policy \(p_0\).
+              Operationally, the slides explain this in three equivalent ways:
+              as a constrained objective, as an extra reward term using \(\log \frac{p_\theta}{p_0}\), and as a closed-form optimal policy proportional to the reference policy times an exponentiated reward.
+            </p>
+            <div class="formula-box">
+              <p>The lecture’s regularized objective is:</p>
+              <p>\[
+                \max_\theta \; \mathbb{E}_{x,y \sim p_\theta}[r_\phi(x,y)] - \beta D_{\mathrm{KL}}(p_\theta(\cdot \mid x) \parallel p_0(\cdot \mid x)).
+              \]</p>
+              <p>Using a sample \(\hat y \sim p_\theta(\cdot \mid x)\), the KL term is approximated by</p>
+              <p>\[
+                \log \frac{p_\theta(\hat y \mid x)}{p_0(\hat y \mid x)},
+                \qquad
+                r'(x,\hat y) = r_\phi(x,\hat y) - \beta \log \frac{p_\theta(\hat y \mid x)}{p_0(\hat y \mid x)}.
+              \]</p>
+              <p>The policy update is then usually implemented with PPO plus an advantage estimator such as GAE.</p>
+            </div>
+            <div class="note-grid">
+              <article class="note-card accent-note">
+                <strong>Why reward hacking happens</strong>
+                <p>The reward model is only a proxy. RL is powerful enough to find distribution shifts or odd outputs that fool the proxy without actually improving the real objective.</p>
+              </article>
+              <article class="note-card blue-note">
+                <strong>What the KL term is doing</strong>
+                <p>It keeps the RL-updated policy near a known-good reference policy, usually the SFT model, so reward optimization cannot roam arbitrarily far in search of proxy exploits.</p>
+              </article>
+              <article class="note-card success-note">
+                <strong>Lecture 16 connection</strong>
+                <p>The optimizer is still recognizable from the previous lecture: PPO plus advantages. What changed is the reward source and the need for regularization against the reference model.</p>
+              </article>
+              <article class="note-card gold-note">
+                <strong>Common misunderstanding</strong>
+                <p>KL regularization does not make the reward model correct. It only reduces how aggressively the policy can exploit its mistakes. A better reward model and better preference data still matter.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title" id="lecture-17-glossary">Glossary</h2>
+      <p class="section-copy">
+        These are the Lecture 17 terms most worth being able to define quickly and precisely.
+      </p>
+      <div class="glossary-grid">
+        <article class="glossary-card">
+          <strong>One-step MDP</strong>
+          <p>An LM RL formulation where the action is a full response and the reward is computed at the sequence level.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Token-level MDP</strong>
+          <p>An LM RL formulation where the state is the prompt plus prefix and the action is the next token.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Cold Start / SFT before RL</strong>
+          <p>Supervised fine-tuning done before RL so the model already knows the task format and can reach rewarding behaviors more easily.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>RLVR</strong>
+          <p>Reinforcement Learning with Verifiable Rewards: RL where correctness is checked by an external verifier such as an answer checker or unit tests.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>GRPO</strong>
+          <p>A PPO-style optimization recipe using group-based advantages, typically by comparing multiple sampled responses for the same prompt.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Preference Model / Reward Model</strong>
+          <p>A learned scorer \(r_\phi(x,y)\) trained so preferred responses get higher scores than rejected ones.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Bradley-Terry Loss</strong>
+          <p>The pairwise preference objective that uses \(\sigma(r(y^+) - r(y^-))\) to model which answer should be preferred.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Reference Policy</strong>
+          <p>The older or SFT policy \(p_0\) kept around so RLHF can penalize drifting too far from it.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>Reward Hacking</strong>
+          <p>Improving the learned reward signal without improving, and sometimes while hurting, the real task objective.</p>
+        </article>
+        <article class="glossary-card">
+          <strong>KL Penalty</strong>
+          <p>A regularizer that charges the policy for moving too far from the reference distribution, usually weighted by \(\beta\).</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">End-of-Lecture Summary</h2>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>Main ideas to keep straight</strong>
+          <ul>
+            <li>Lecture 17 turns Lecture 16’s generic RL language into LM-specific design decisions about action granularity, reward source, and initialization.</li>
+            <li>RLVR is the clean setting where reward comes from a verifier, so string reversal, math answers, and coding tests can all share one RL template.</li>
+            <li>GRPO is best understood as an advantage-estimation choice on top of PPO-style RL, not as a separate reward source.</li>
+            <li>Math-reasoning RL uses the same sequence-level policy and sparse reward story as Lecture 16, but with checkable final answers.</li>
+            <li>RLHF is a three-stage pipeline: SFT, reward modeling from preferences, then RL against the learned reward.</li>
+            <li>Because learned rewards can be exploited, RLHF usually adds a KL penalty to keep the policy near a reference model.</li>
+          </ul>
+        </article>
+        <article class="summary-card">
+          <strong>Exam-oriented comparison</strong>
+          <ul>
+            <li><strong>RLVR</strong>: defined by its reward source. It uses a checker, not a learned reward model.</li>
+            <li><strong>RLHF</strong>: defined by its pipeline and reward source. It needs preference data, a learned reward model, and usually PPO plus KL control.</li>
+            <li><strong>PPO</strong>: a loss / update-control mechanism. It can appear in both RLVR and RLHF.</li>
+            <li><strong>GRPO</strong>: an advantage recipe. It can sit on top of different reward sources, and it is especially natural when multiple samples per prompt are already being generated.</li>
+            <li>The lecture’s own summary table is organized by <em>reward</em>, <em>advantages</em>, and <em>loss</em>. That is the safest way to keep these methods from collapsing into one vague bucket.</li>
+          </ul>
+        </article>
+        <article class="summary-card jump-target" id="lecture-17-self-quiz">
+          <strong>Self-quiz prompts</strong>
+          <ul>
+            <li>If the policy is a language model, what are the state and action in a one-step MDP versus a token-level MDP?</li>
+            <li>Why does SFT before RL often help even if the final objective is reward-driven?</li>
+            <li>What makes a reward “verifiable,” and why does that make RLVR easier than RLHF?</li>
+            <li>How do group-based advantages relate to the baseline or advantage ideas from Lecture 16?</li>
+            <li>Why does the Bradley-Terry preference loss depend on \(r(y^+) - r(y^-)\) rather than two separate scores?</li>
+            <li>What failure mode is the KL penalty trying to reduce in RLHF, and what model serves as the reference policy?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
     <div class="footer">
-      This site now covers <code>anlp-s2026-11-multimodal.pdf</code>, <code>anlp-s2026-12-multimodal-ii.pdf</code>, <code>anlp-s2026-15-multimodal-iii.pdf</code>, and <code>anlp-s2026-16-rl.pdf</code> in one reusable lecture-by-lecture scaffold.
+      This site now covers <code>anlp-s2026-11-multimodal.pdf</code>, <code>anlp-s2026-12-multimodal-ii.pdf</code>, <code>anlp-s2026-15-multimodal-iii.pdf</code>, <code>anlp-s2026-16-rl.pdf</code>, and <code>anlp-s2026-17-rl-llms.pdf</code> in one reusable lecture-by-lecture scaffold.
       The shared root <code>index.html</code>, shared assets under <code>assets/</code>, and tabbed lecture panels are set up so future lecture companions can plug into the same structure cleanly.
     </div>
   </main>
